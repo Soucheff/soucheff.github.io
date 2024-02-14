@@ -23,69 +23,103 @@ O artigo será divido em 6 seções:
 > * Authentication => AuthN
 > * Authrorization => AuthZ
 > * Identity Access Manegament => IAM
-> * Identity Provider => IDP
+> * Identity Provider => IdP
 > * Service Provider => SP
+> * Single Sign-On => SSO
 
-### Conceitos basico - Autenticação e Autorização
+### Conceitos basico
+
+#### Autenticação e Autorização
 A Autenticação(AuthN) é o processo de identitificar o agente, ou seja responder a perguntar "Who are you?".
 
-Já o processo de Autorização(AuthZ) é ação de conceder permissão de acesso aos recursos solicitados, desde que devidamente autenticado e autorizado.
+Já o processo de Autorização(AuthZ) é a validação se o agente tem da permissão de acesso aos recursos solicitados, "Can you do that?".
 
-### Era das senhas(passwords): O inicio
-A ideia de termos uma senha como meio para nos identificar com já que inicialmente seria algo que somente nós saberiamos e portanto a aplicação conseguiria autenticar o usuário.
+#### Autenticação moderna
+A autenticação moderna é realizada por um IdP qual irá realizar a correta identificação do usuário e irá emitir tokens para a aplicação de maneira que a aplicação não precise a coleta por exemplo de login e senha do 
+usuário para que realize a autenticação e autorização.
 
-Porém esse tipo de estrátegia no inicio foi implementada com as senhas em clear text sem nenhum metodo de hashing possibilitando que quem tivesse acesso aos datastores onde haviam os usuários e senhas podessem ser lidos facilmente e logo outras agentes conseguiriam se passar pelo usuário:
+Esse metodo de autenticação além de possibilitar uma segurança maior no processo, centralização da identidade, facilita a integração com outras aplicações(desde que falem os protocolos modernos) e implementações de novos metodos de autenticação sem a necessidade de alteração das aplicações
 
-Exemplo da uma tabela com senha em clear text:
-| Username          | Password       |
-|-------------------|----------------|
-| Admin             | Admin01        |
-| User01            | User0101       |
-| User02            | USer0202       |
+### SAML 2.0
 
-#### Evolução das senhas
-Para uma melhoria na segurança das senhas começou a ser utilizado processo para encriptirar as senha sendo os melhor processos que fossem não reversiveis como por exemplo: MD5, SHA1, SHA256
-Exemplo da mesma tabela usando MD5:
-```python
-import hashlib
-password = (b'Admin01')
-result = hashlib.md5(password)
-print(str(password)+' - '+result.hexdigest())
-password = (b'User0101')
-result = hashlib.md5(password)
-print(str(password)+' - '+result.hexdigest())
-password = (b'USer0202')
-result = hashlib.md5(password)
-print(str(password)+' - '+result.hexdigest())
-```
-| Username          | Hashed Password                   |
-|------------------ |-----------------                  |
-| Admin             | 5b56707735bed7117162b252685a19a1  |
-| User01            | 961b2abefbbe46d11941b3f12583ae27  |
-| User02            | 4979bbde735adc79fa65fc231ce31b8a  |
+**Security Assertion Markup Language (SAML)** é um dos metódos modernos de autenticação qual permite que o usuário realize o login em diversas aplicações utilizando a mesma credencial.
 
-### Uso de protocolos modernos de autenticação e autorização
+1. **O que é o SAML?**
+    - **SAML** é um protocolo utilizado entre o IDP e o SP de maneira a realizar a autenticação e a autorização do usuário nas aplicações.
+    - Esse protocolo possibilita o uso do SSO de maneira a permitir que o usuário reutilize sua sessão com o IdP para autenticar em diversas aplicação evitando a necessidade de realizar multiplas autenticações.
+    - A versão mais atual e utilizada é a **SAML 2.0** com a última atualização em 17 de janeiro de 2019.
+    - Mantido pela [OASIS](https://wiki.oasis-open.org/security/FrontPage)
 
-Como vimos anteriormente o uso de senha é uma das maneiras dos usuário se autenticarem porém a adoção desse metodo cada aplicação deverá ser responsavel em proteger esses dados além de implementar melhorias de segurança
+2. **Exemplo de fluxo no Entra ID**
+    - Fluxo de autenticação SAML com Entra ID
 
-Portanto o ideal é a delegeção nessa arquitetura para que a autenticação e autorização seja realizada por sistemas especializados nessa ação liberando que a aplicação concentre-se em implementar as regras de negócio.
+    ![Flow Saml](./images/saml-auth.png)
 
-Com isso começamos a ver a figura dos IAMs que irão atuar como IDPs para as aplicações. Para que toda a ação ocorra com segurança e eficiencia se faz necessário o uso de protocolos para essa atividade.
+3. **Caracteristicas**
+   - O **SAML** é um procotocolo baseado em XML.
+   - O token será conduzido sempre na camada de front-channel
+   - Possibilidade do uso do encryption token
+   - Aceita IdP Initiate e SP Initiate
+   - Trabalha com SAML metadata para configurações do IdP e do SP
+
+4. **Exemplo do Token**
+    - AuthN Request no caso do SP Initiated
+
+    - AuthN Response
+
+### OAuth 2.0
+**OAuth (Open Authorization)** é um protocolo aberto que trabalha na camada de autorização possibilitando o acesso a recursos de maneira delegada ou pela aplicação.
+
+1. **O que é o OAuth?**
+    - OAuth permite que usuário sejam autorizado nas aplicações de maneira que ela não precisem realizar essas validações.
+    - É um protocolo muito utilizado tantos pelos IdPs como por SPs.
+    - Nele é previsto o uso de concentimento para acesso aos recursos em nome de um usuário.
+    - Trabalha na camada HTTP.
+    - Tokens são formatados em JWT.
+    - Há 6 tipos de fluxos previstos:
+        - Authorization Code grant
+        - Client Credentials grant
+        - Device Code flow
+        - On-Behalf-Of flow
+        - Implicit Grant flow
+        - Resource Owner Password Credentials grant
+    - [RFC 6749](https://www.rfc-editor.org/rfc/rfc6749)
+
+2. **Exemplo de fluxo no Entra ID**
+    - Exemplo de fluxo do OAuth com Entra ID
+
+    ![OAuth Flow](./images/oauth.png)
 
 
+3. **Funcionamento do OAuth**
+    - OAuth possui normalmente quatro atores no processo:
+        - **Resource Owner**: Agente que irá autorizar o acessar os dados pela aplicação
+        - **Client (Application)**: Aplicação que irá realizar o acesso os dados.
+        - **Resource Server**: Onde os dados que serão consumidos são disponibilizado.
+        - **Authorization Server**: Recurso responsável por emitir os token autorizando o acesso.
+    - Workflow:
+    
+        ![Workflow OAuth](./images/oauth-flow.png)
+        - (A) O client solicita a autorização para acesso aos dados localizados no Resource Server ao Authorization Server.
+        - (B) O usuário depois de identificado e devidamente autorizado tem os tokens(Access Token e Refresh Token) emitidos pelo Authorization Server.
+        - (C) O client em posse do Access Token envia-o para o Resource Server para obter os dados protegidos e realiza esse fluxo até a invalidade do Access Token(F)
+        - (G) O client com o token invalido utiliza o Refresh Token para obtenção de novos Tokens e retornar ao item C
 
+4. **Caracteristicas**
+   - OAuth apenas atua na camada de AuthZ sendo a camada de AuthN ficando sob responsabilidade do OIDC
+   - Possui diversos fluxos com caracteristicas especifica que serão abordados na seção 2
+   - Tokens no formato JWT
 
+### Open ID Connect
+**OpenID Connect (OIDC)** é um protocolo de autenticação qual utiliza o OAuth 2.0 como base. Seu objetivo é realizar a autenticação dos usuários visto que o OAuth foi desenhado para realizar a AuthZ:
 
-### Melhorias
-- **NIST Guidelines**: Users no longer need special characters in passwords. Increased character allowances and password managers are encouraged⁶.
-- **Multi-Factor Authentication (MFA)**: A supplement to passwords, MFA prompts users to enter a code after their password.
-- **Passwordless**: Autenticação utilizando outras maneiras de validar a identitdade sem necessidade de senha
+1. **What is OpenID Connect?**
+    - **OpenID Connect** a sua implementação é realizada junto com o framework do OAuth tornando a sua utilização facilitada já que ele será emitido também pelo mesmo **Authorization Server**.
+    - Possibilita a obtenção de informações do usuário autenticado.
 
+2. **Exemplo de fluxo no Entra ID**
+    - O Fluxo do OIDC segue o mesmo padrão do visto no OAuth
 
-Source: Conversation with Bing, 2/13/2024
-(1) undefined. https://pages.nist.gov/800-63-3/sp800-63b.html.
-(2) The Evolution of Authentication - OWASP Foundation. https://owasp.org/www-chapter-vancouver/assets/presentations/2020-08_The_Evolution_of_Authentication.pdf.
-(3) The evolution of authentication - BAI. https://www.bai.org/banking-strategies/the-evolution-of-authentication/.
-(4) The Evolution of Authentication to a Passwordless World. https://www.loginradius.com/blog/growth/authentication-evolution-to-passwordless/.
-(5) The Evolution of Authentication | WIRED. https://www.wired.com/insights/2014/04/evolution-authentication/.
-(6) THE EVOLUTION OF AUTHENTICATION - Goode Intelligence. https://www.goodeintelligence.com/wp-content/uploads/2019/06/Goode-Intelligence-White-Paper-The_Evolution_of_Authentication.pdf.
+3. **Beneficios do OIDC:**
+   - Prove uma maneira segura de validar qual a identidade do usuário logado na aplicação entregando nas claims as informações necessárias.
+   - Retira da aplicação a responsabilidade de armazenar os dados do usuário e delegando essa atribuição para o IdP entregar conforme a necessidade da aplicação.
