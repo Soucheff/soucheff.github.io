@@ -1,0 +1,179 @@
+@import './tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: theme('fontFamily.sans');
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    min-height: 100vh;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+  }
+
+  a {
+    color: var(--color-primary);
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
+
+  ::selection {
+    background-color: var(--color-primary);
+    color: var(--color-primary-fg);
+  }
+
+  /* Shiki dual-theme: o plugin gera duas árvores aninhadas; alternamos via data-theme. */
+  html:not([data-theme="dark"]) .astro-code,
+  html:not([data-theme="dark"]) .astro-code span {
+    color: var(--shiki-light) !important;
+    background-color: var(--shiki-light-bg) !important;
+    font-style: var(--shiki-light-font-style) !important;
+    font-weight: var(--shiki-light-font-weight) !important;
+    text-decoration: var(--shiki-light-text-decoration) !important;
+  }
+
+  html[data-theme="dark"] .astro-code,
+  html[data-theme="dark"] .astro-code span {
+    color: var(--shiki-dark) !important;
+    background-color: var(--shiki-dark-bg) !important;
+    font-style: var(--shiki-dark-font-style) !important;
+    font-weight: var(--shiki-dark-font-weight) !important;
+    text-decoration: var(--shiki-dark-text-decoration) !important;
+  }
+
+  .astro-code {
+    padding: 1rem;
+    border-radius: var(--radius);
+    overflow-x: auto;
+    border: 1px solid var(--color-border);
+  }
+
+  :not(pre) > code {
+    background-color: var(--color-code-bg);
+    color: var(--color-code-text);
+    padding: 0.15rem 0.35rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.92em;
+  }
+
+  /* Mermaid SVGs embutidos pelo rehype-mermaid */
+  .mermaid svg,
+  svg[data-mermaid="true"] {
+    max-width: 100%;
+    height: auto;
+    background: var(--color-surface);
+    border-radius: var(--radius);
+    padding: 0.75rem;
+    border: 1px solid var(--color-border);
+  }
+
+  /* Anchor de heading (rehype-autolink-headings) */
+  .heading-anchor {
+    margin-left: 0.4rem;
+    opacity: 0;
+    transition: opacity 120ms ease-in-out;
+    color: var(--color-text-muted);
+    text-decoration: none;
+    border-bottom: none;
+  }
+
+  :is(h1, h2, h3, h4, h5, h6):hover .heading-anchor {
+    opacity: 1;
+  }
+
+  /* i18n single-source: esconde blocos do idioma "errado" no escopo da página. */
+  .locale-scope[data-locale-current="pt"] [data-lang]:not([data-lang="pt"]) {
+    display: none !important;
+  }
+  .locale-scope[data-locale-current="en"] [data-lang]:not([data-lang="en"]) {
+    display: none !important;
+  }
+}
+
+@layer components {
+  .container-narrow {
+    max-width: 72ch;
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+  }
+
+  .container-wide {
+    max-width: 1080px;
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    border-radius: var(--radius);
+    font-weight: 600;
+    transition: transform 80ms ease, box-shadow 120ms ease, background-color 120ms ease;
+  }
+
+  .btn-primary {
+    background-color: var(--color-primary);
+    color: var(--color-primary-fg);
+  }
+
+  .btn-primary:hover {
+    text-decoration: none;
+    box-shadow: var(--shadow);
+    transform: translateY(-1px);
+  }
+
+  .btn-accent {
+    background-color: var(--color-accent);
+    color: var(--color-accent-fg);
+  }
+
+  .btn-accent:hover {
+    text-decoration: none;
+    box-shadow: var(--shadow);
+    transform: translateY(-1px);
+  }
+
+  .card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem 1.5rem;
+    transition: border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+  }
+
+  .card:hover {
+    border-color: var(--color-primary);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.55rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background-color: color-mix(in srgb, var(--color-primary) 12%, transparent);
+    color: var(--color-primary);
+    border: 1px solid color-mix(in srgb, var(--color-primary) 30%, transparent);
+  }
+
+  .badge-accent {
+    background-color: color-mix(in srgb, var(--color-accent) 14%, transparent);
+    color: var(--color-accent);
+    border-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
+  }
+}

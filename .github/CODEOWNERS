@@ -1,0 +1,13 @@
+# Catch-all — Pedro é o reviewer padrão de tudo.
+* @soucheff
+
+# Conteúdo editorial: artigos e demos.
+/src/content/articles/  @soucheff
+/src/content/demos/     @soucheff
+
+# Infraestrutura, CI/CD e governança.
+/.github/               @soucheff
+/astro.config.mjs       @soucheff
+/package.json           @soucheff
+/package-lock.json      @soucheff
+/scripts/               @soucheff

@@ -1,0 +1,20 @@
+---
+import type { Locale } from '@/lib/i18n';
+import { collectionPath } from '@/lib/i18n';
+
+interface Props {
+  tag: string;
+  locale: Locale;
+  variant?: 'primary' | 'accent';
+}
+
+const { tag, locale, variant = 'primary' } = Astro.props;
+const href = `${collectionPath('tags', locale)}/${encodeURIComponent(tag)}`;
+---
+
+<a
+  href={href}
+  class:list={['badge', variant === 'accent' && 'badge-accent', 'no-underline']}
+>
+  #{tag}
+</a>

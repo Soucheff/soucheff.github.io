@@ -1,0 +1,28 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import DemoCard from '@/components/DemoCard.astro';
+import { ui, type Locale } from '@/lib/i18n';
+import { getDemosForLocale } from '@/lib/content';
+
+const locale: Locale = 'en';
+const t = ui[locale];
+const demos = await getDemosForLocale(locale);
+---
+
+<BaseLayout
+  locale={locale}
+  title={t.navDemos}
+  description={t.tagline}
+  translations={{ pt: '/demos', en: '/en/demos' }}
+>
+  <h1 class="mb-6 text-3xl font-bold" style="color: var(--color-text);">{t.navDemos}</h1>
+  {demos.length === 0 ? (
+    <p style="color: var(--color-text-muted);">{t.noContent}</p>
+  ) : (
+    <div class="grid gap-4 md:grid-cols-2">
+      {demos.map((entry) => (
+        <DemoCard entry={entry} locale={locale} />
+      ))}
+    </div>
+  )}
+</BaseLayout>

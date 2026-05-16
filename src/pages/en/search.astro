@@ -1,0 +1,35 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { ui, type Locale } from '@/lib/i18n';
+
+const locale: Locale = 'en';
+const t = ui[locale];
+---
+
+<BaseLayout
+  locale={locale}
+  title={t.searchTitle}
+  description={t.searchTitle}
+  translations={{ pt: '/buscar', en: '/en/search' }}
+  indexable={false}
+>
+  <h1 class="mb-6 text-3xl font-bold" style="color: var(--color-text);">{t.searchTitle}</h1>
+
+  <div id="search" data-pagefind-ui></div>
+
+  <link rel="stylesheet" href="/pagefind/pagefind-ui.css" />
+  <script is:inline src="/pagefind/pagefind-ui.js"></script>
+  <script is:inline define:vars={{ lang: locale }}>
+    window.addEventListener('DOMContentLoaded', () => {
+      if (typeof window.PagefindUI !== 'undefined') {
+        new window.PagefindUI({
+          element: '#search',
+          showImages: false,
+          showSubResults: true,
+          baseUrl: '/',
+          filters: { lang: [lang] },
+        });
+      }
+    });
+  </script>
+</BaseLayout>

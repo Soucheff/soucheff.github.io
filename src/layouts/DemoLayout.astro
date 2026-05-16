@@ -1,0 +1,69 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import type { Locale } from '@/lib/i18n';
+import { collectionPath, getLocalizedMeta, ui } from '@/lib/i18n';
+import BaseLayout from './BaseLayout.astro';
+import TagBadge from '@/components/TagBadge.astro';
+
+interface Props {
+  entry: CollectionEntry<'demos'>;
+  locale: Locale;
+  translations: Partial<Record<Locale, string>>;
+}
+
+const { entry, locale, translations } = Astro.props;
+const meta = getLocalizedMeta(entry, locale);
+const t = ui[locale];
+---
+
+<BaseLayout
+  locale={locale}
+  title={meta.title}
+  description={meta.description}
+  translations={translations}
+  pagefindType="demo"
+>
+  <article class="container-narrow">
+    <p class="mb-2 text-sm">
+      <a href={collectionPath('demos', locale)} class="no-underline" style="color: var(--color-text-muted);">← {t.backToList}</a>
+    </p>
+    <h1 class="mb-3 text-4xl font-bold" style="color: var(--color-text);">{meta.title}</h1>
+    <p class="mb-4 text-lg" style="color: var(--color-text-muted);">{meta.description}</p>
+
+    <div class="mb-4 flex flex-wrap gap-3 text-sm">
+      {entry.data.liveUrl && (
+        <a class="btn btn-primary" href={entry.data.liveUrl} target="_blank" rel="noopener noreferrer">
+          {t.liveDemo} ↗
+        </a>
+      )}
+      {entry.data.repoUrl && (
+        <a class="btn btn-accent" href={entry.data.repoUrl} target="_blank" rel="noopener noreferrer">
+          {t.sourceCode} ↗
+        </a>
+      )}
+    </div>
+
+    {entry.data.tech.length > 0 && (
+      <div class="mb-3">
+        <p class="mb-1 text-sm font-semibold" style="color: var(--color-text-muted);">{t.techStack}</p>
+        <div class="flex flex-wrap gap-1.5">
+          {entry.data.tech.map((techItem) => (
+            <span class="badge badge-accent">{techItem}</span>
+          ))}
+        </div>
+      </div>
+    )}
+
+    {entry.data.tags.length > 0 && (
+      <div class="mb-8 flex flex-wrap gap-1.5">
+        {entry.data.tags.map((tag) => (
+          <TagBadge tag={tag} locale={locale} />
+        ))}
+      </div>
+    )}
+
+    <div class="prose dark:prose-invert max-w-none">
+      <slot />
+    </div>
+  </article>
+</BaseLayout>

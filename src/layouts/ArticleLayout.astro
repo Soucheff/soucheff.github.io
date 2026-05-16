@@ -1,0 +1,67 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import type { Locale } from '@/lib/i18n';
+import { collectionPath, getLocalizedMeta, ui } from '@/lib/i18n';
+import BaseLayout from './BaseLayout.astro';
+import TagBadge from '@/components/TagBadge.astro';
+
+interface Props {
+  entry: CollectionEntry<'articles'>;
+  locale: Locale;
+  translations: Partial<Record<Locale, string>>;
+}
+
+const { entry, locale, translations } = Astro.props;
+const meta = getLocalizedMeta(entry, locale);
+const t = ui[locale];
+
+const formatter = new Intl.DateTimeFormat(locale === 'pt' ? 'pt-BR' : 'en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+});
+---
+
+<BaseLayout
+  locale={locale}
+  title={meta.title}
+  description={meta.description}
+  translations={translations}
+  pagefindType="article"
+>
+  <article class="container-narrow">
+    <p class="mb-2 text-sm">
+      <a href={collectionPath('articles', locale)} class="no-underline" style="color: var(--color-text-muted);">← {t.backToList}</a>
+    </p>
+    <h1 class="mb-3 text-4xl font-bold" style="color: var(--color-text);">{meta.title}</h1>
+    <p class="mb-4 text-lg" style="color: var(--color-text-muted);">{meta.description}</p>
+
+    <div class="mb-6 flex flex-wrap items-center gap-3 text-sm" style="color: var(--color-text-muted);">
+      <span><strong>{t.author}:</strong> {entry.data.author}</span>
+      <span>·</span>
+      <time datetime={entry.data.pubDate.toISOString()}>
+        {t.publishedOn} {formatter.format(entry.data.pubDate)}
+      </time>
+      {entry.data.updatedDate && (
+        <>
+          <span>·</span>
+          <time datetime={entry.data.updatedDate.toISOString()}>
+            {t.updatedOn} {formatter.format(entry.data.updatedDate)}
+          </time>
+        </>
+      )}
+    </div>
+
+    {entry.data.tags.length > 0 && (
+      <div class="mb-8 flex flex-wrap gap-1.5">
+        {entry.data.tags.map((tag) => (
+          <TagBadge tag={tag} locale={locale} />
+        ))}
+      </div>
+    )}
+
+    <div class="prose dark:prose-invert max-w-none">
+      <slot />
+    </div>
+  </article>
+</BaseLayout>

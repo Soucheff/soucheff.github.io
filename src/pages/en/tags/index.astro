@@ -1,0 +1,35 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { ui, collectionPath, type Locale } from '@/lib/i18n';
+import { getTagAggregation } from '@/lib/content';
+
+const locale: Locale = 'en';
+const t = ui[locale];
+const tags = await getTagAggregation(locale);
+---
+
+<BaseLayout
+  locale={locale}
+  title={t.navTags}
+  description={t.tagline}
+  translations={{ pt: '/tags', en: '/en/tags' }}
+>
+  <h1 class="mb-6 text-3xl font-bold" style="color: var(--color-text);">{t.navTags}</h1>
+  {tags.length === 0 ? (
+    <p style="color: var(--color-text-muted);">{t.noContent}</p>
+  ) : (
+    <ul class="flex flex-wrap gap-2">
+      {tags.map((tag) => (
+        <li>
+          <a
+            href={`${collectionPath('tags', locale)}/${encodeURIComponent(tag.tag)}`}
+            class="badge no-underline"
+            style="font-size: 0.875rem;"
+          >
+            #{tag.tag} <span class="ml-1 opacity-70">({tag.total})</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  )}
+</BaseLayout>

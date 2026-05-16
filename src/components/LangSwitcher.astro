@@ -1,0 +1,72 @@
+---
+import type { Locale } from '@/lib/i18n';
+import { ui } from '@/lib/i18n';
+
+interface Props {
+  /** Locale atual da página. */
+  currentLocale: Locale;
+  /**
+   * Mapa de URLs equivalentes em outras línguas. Quando uma chave existe,
+   * o switcher renderiza o link; quando ausente, o item é mostrado como
+   * desabilitado (sem tradução disponível).
+   */
+  translations?: Partial<Record<Locale, string>>;
+  /** Default: gera links para a home equivalente em cada idioma. */
+  fallbackHome?: boolean;
+}
+
+const { currentLocale, translations, fallbackHome = false } = Astro.props;
+const t = ui[currentLocale];
+
+const map: Partial<Record<Locale, string>> = {
+  ...(fallbackHome ? { pt: '/', en: '/en/' } : {}),
+  ...(translations ?? {}),
+};
+
+const items: Array<{ locale: Locale; label: string; href?: string }> = [
+  { locale: 'pt', label: 'PT', href: map.pt },
+  { locale: 'en', label: 'EN', href: map.en },
+];
+---
+
+<div
+  class="inline-flex items-center gap-1 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-0.5 text-sm"
+  role="group"
+  aria-label={t.languageSwitcher}
+>
+  {items.map((item) => {
+    const isCurrent = item.locale === currentLocale;
+    const isAvailable = Boolean(item.href);
+    if (isCurrent) {
+      return (
+        <span
+          class="rounded px-2 py-1 font-semibold"
+          style="background-color: var(--color-primary); color: var(--color-primary-fg);"
+          aria-current="true"
+        >
+          {item.label}
+        </span>
+      );
+    }
+    if (isAvailable) {
+      return (
+        <a
+          href={item.href}
+          class="rounded px-2 py-1 text-[color:var(--color-text-muted)] hover:text-[color:var(--color-primary)]"
+          hreflang={item.locale === 'pt' ? 'pt-BR' : 'en-US'}
+        >
+          {item.label}
+        </a>
+      );
+    }
+    return (
+      <span
+        class="rounded px-2 py-1 text-[color:var(--color-text-muted)] opacity-50"
+        title={currentLocale === 'pt' ? 'Tradução indisponível' : 'Translation unavailable'}
+        aria-disabled="true"
+      >
+        {item.label}
+      </span>
+    );
+  })}
+</div>

@@ -1,0 +1,35 @@
+---
+import { getCollection, type CollectionEntry } from 'astro:content';
+import ArticleLayout from '@/layouts/ArticleLayout.astro';
+import type { Locale } from '@/lib/i18n';
+import { entryUrl, getEntryLocales } from '@/lib/i18n';
+
+export async function getStaticPaths() {
+  const entries = await getCollection('articles', (e) => import.meta.env.DEV || !e.data.draft);
+  return entries
+    .filter((entry) => getEntryLocales(entry).includes('pt'))
+    .map((entry) => ({ params: { slug: entry.slug }, props: { entry } }));
+}
+
+interface Props {
+  entry: CollectionEntry<'articles'>;
+}
+
+const { entry } = Astro.props;
+const locale: Locale = 'pt';
+const { Content } = await entry.render();
+
+const locales = getEntryLocales(entry);
+const translations: Partial<Record<Locale, string>> = {
+  pt: entryUrl('articles', entry.slug, 'pt'),
+};
+if (locales.includes('en')) {
+  translations.en = entryUrl('articles', entry.slug, 'en');
+}
+---
+
+<ArticleLayout entry={entry} locale={locale} translations={translations}>
+  <div data-locale-current={locale} class="locale-scope">
+    <Content />
+  </div>
+</ArticleLayout>

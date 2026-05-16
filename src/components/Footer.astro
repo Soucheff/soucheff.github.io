@@ -1,0 +1,26 @@
+---
+import type { Locale } from '@/lib/i18n';
+import { ui } from '@/lib/i18n';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = ui[locale];
+const year = new Date().getFullYear();
+---
+
+<footer
+  class="mt-16 border-t border-[color:var(--color-border)]"
+  style="background-color: var(--color-surface);"
+>
+  <div class="container-wide flex flex-col gap-2 py-6 text-sm sm:flex-row sm:items-center sm:justify-between" style="color: var(--color-text-muted);">
+    <p>&copy; {year} {t.siteName}. {locale === 'pt' ? 'Conteúdo sob CC BY 4.0.' : 'Content licensed under CC BY 4.0.'}</p>
+    <p class="flex items-center gap-3">
+      <a href="https://github.com/soucheff" rel="me noopener" target="_blank">GitHub</a>
+      <span aria-hidden="true">·</span>
+      <a href="https://github.com/soucheff/soucheff.github.io" rel="noopener" target="_blank">{locale === 'pt' ? 'Repositório' : 'Repository'}</a>
+    </p>
+  </div>
+</footer>

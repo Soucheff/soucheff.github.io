@@ -1,0 +1,28 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import ArticleCard from '@/components/ArticleCard.astro';
+import { ui, type Locale } from '@/lib/i18n';
+import { getArticlesForLocale } from '@/lib/content';
+
+const locale: Locale = 'pt';
+const t = ui[locale];
+const articles = await getArticlesForLocale(locale);
+---
+
+<BaseLayout
+  locale={locale}
+  title={t.navArticles}
+  description={t.tagline}
+  translations={{ pt: '/artigos', en: '/en/articles' }}
+>
+  <h1 class="mb-6 text-3xl font-bold" style="color: var(--color-text);">{t.navArticles}</h1>
+  {articles.length === 0 ? (
+    <p style="color: var(--color-text-muted);">{t.noContent}</p>
+  ) : (
+    <div class="grid gap-4 md:grid-cols-2">
+      {articles.map((entry) => (
+        <ArticleCard entry={entry} locale={locale} />
+      ))}
+    </div>
+  )}
+</BaseLayout>

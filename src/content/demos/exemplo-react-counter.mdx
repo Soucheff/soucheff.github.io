@@ -1,0 +1,66 @@
+---
+pubDate: 2026-05-16
+author: Pedro Soucheff
+tags:
+  - demo
+  - react
+  - islands
+tech:
+  - Astro
+  - React
+  - TypeScript
+i18n:
+  pt:
+    title: Ilha React — contador conceitual
+    description: Demonstração mínima de uma ilha React em uma página estática Astro, com hidratação on-visible.
+  en:
+    title: React Island — conceptual counter
+    description: Minimal demonstration of a React island in a static Astro page, hydrated on-visible.
+---
+
+import Counter from '@/components/demo/Counter.tsx';
+
+:::lang{pt}
+## O conceito de "ilhas"
+
+Astro renderiza páginas como **HTML estático** por padrão. Componentes interativos (React, Svelte,
+Vue, Solid...) são "ilhas" — pequenas regiões que recebem JavaScript apenas quando necessário.
+Isso resulta em páginas leves e rápidas, com interatividade pontual onde faz sentido.
+:::
+
+:::lang{en}
+## The "islands" concept
+
+Astro renders pages as **static HTML** by default. Interactive components (React, Svelte, Vue,
+Solid...) are "islands" — small regions that ship JavaScript only when needed. This results in
+lightweight, fast pages with targeted interactivity where it matters.
+:::
+
+<Counter client:visible />
+
+:::lang{pt}
+## Como funciona
+
+O componente acima é um `Counter` em React. A diretiva `client:visible` instrui o Astro a hidratar
+o componente **apenas quando ele entra no viewport** — economizando banda e CPU em dispositivos
+móveis.
+
+```tsx
+import Counter from '@/components/demo/Counter.tsx';
+// ...
+<Counter client:visible />
+```
+:::
+
+:::lang{en}
+## How it works
+
+The component above is a React `Counter`. The `client:visible` directive tells Astro to hydrate
+the component **only when it enters the viewport** — saving bandwidth and CPU on mobile devices.
+
+```tsx
+import Counter from '@/components/demo/Counter.tsx';
+// ...
+<Counter client:visible />
+```
+:::

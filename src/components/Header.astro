@@ -1,0 +1,67 @@
+---
+import type { Locale } from '@/lib/i18n';
+import { ui, collectionPath } from '@/lib/i18n';
+import ThemeToggle from './ThemeToggle.astro';
+import LangSwitcher from './LangSwitcher.astro';
+
+interface Props {
+  locale: Locale;
+  translations?: Partial<Record<Locale, string>>;
+}
+
+const { locale, translations } = Astro.props;
+const t = ui[locale];
+
+const homeHref = locale === 'pt' ? '/' : '/en/';
+
+const nav = [
+  { href: homeHref, label: t.navHome },
+  { href: collectionPath('articles', locale), label: t.navArticles },
+  { href: collectionPath('demos', locale), label: t.navDemos },
+  { href: collectionPath('tags', locale), label: t.navTags },
+  { href: collectionPath('search', locale), label: t.navSearch },
+];
+
+const currentPath = Astro.url.pathname.replace(/\/$/, '') || '/';
+const isActive = (href: string) => {
+  const normalized = href.replace(/\/$/, '') || '/';
+  if (normalized === '/' || normalized === '/en') {
+    return currentPath === normalized || currentPath === `${normalized}/`;
+  }
+  return currentPath === normalized || currentPath.startsWith(`${normalized}/`);
+};
+---
+
+<header
+  class="border-b border-[color:var(--color-border)]"
+  style="background-color: var(--color-surface);"
+>
+  <div class="container-wide flex flex-wrap items-center gap-4 py-4">
+    <a href={homeHref} class="flex items-center gap-2 text-base font-bold no-underline" style="color: var(--color-text);">
+      <img src="/favicon.svg" alt="" width="28" height="28" />
+      <span>{t.siteName}</span>
+    </a>
+
+    <nav aria-label="primary" class="ml-auto flex flex-wrap items-center gap-1">
+      {nav.map((item) => (
+        <a
+          href={item.href}
+          class:list={[
+            'rounded-md px-3 py-1.5 text-sm font-medium no-underline',
+            isActive(item.href)
+              ? 'text-[color:var(--color-primary)]'
+              : 'text-[color:var(--color-text-muted)] hover:text-[color:var(--color-primary)]',
+          ]}
+          aria-current={isActive(item.href) ? 'page' : undefined}
+        >
+          {item.label}
+        </a>
+      ))}
+    </nav>
+
+    <div class="flex items-center gap-2">
+      <LangSwitcher currentLocale={locale} translations={translations} fallbackHome={!translations} />
+      <ThemeToggle locale={locale} />
+    </div>
+  </div>
+</header>

@@ -1,0 +1,65 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import ArticleCard from '@/components/ArticleCard.astro';
+import DemoCard from '@/components/DemoCard.astro';
+import { ui, type Locale } from '@/lib/i18n';
+import { getArticlesForLocale, getDemosForLocale, getTagAggregation } from '@/lib/content';
+
+const locale: Locale = 'en';
+const t = ui[locale];
+
+export async function getStaticPaths() {
+  const tags = await getTagAggregation('en');
+  return tags.map(({ tag }) => ({ params: { tag } }));
+}
+
+const { tag } = Astro.params;
+const safeTag = decodeURIComponent(tag ?? '');
+
+const [allArticles, allDemos] = await Promise.all([
+  getArticlesForLocale(locale),
+  getDemosForLocale(locale),
+]);
+const articles = allArticles.filter((e) => e.data.tags.includes(safeTag));
+const demos = allDemos.filter((e) => e.data.tags.includes(safeTag));
+---
+
+<BaseLayout
+  locale={locale}
+  title={`#${safeTag}`}
+  description={`${t.taggedWith} ${safeTag}`}
+  translations={{ pt: `/tags/${encodeURIComponent(safeTag)}`, en: `/en/tags/${encodeURIComponent(safeTag)}` }}
+>
+  <p class="mb-1 text-sm" style="color: var(--color-text-muted);">{t.taggedWith}</p>
+  <h1 class="mb-8 text-3xl font-bold" style="color: var(--color-text);">#{safeTag}</h1>
+
+  {articles.length > 0 && (
+    <section class="mb-10">
+      <h2 class="mb-3 text-xl font-bold" style="color: var(--color-text);">
+        {t.navArticles} <span style="color: var(--color-text-muted);">({articles.length})</span>
+      </h2>
+      <div class="grid gap-4 md:grid-cols-2">
+        {articles.map((entry) => (
+          <ArticleCard entry={entry} locale={locale} />
+        ))}
+      </div>
+    </section>
+  )}
+
+  {demos.length > 0 && (
+    <section>
+      <h2 class="mb-3 text-xl font-bold" style="color: var(--color-text);">
+        {t.navDemos} <span style="color: var(--color-text-muted);">({demos.length})</span>
+      </h2>
+      <div class="grid gap-4 md:grid-cols-2">
+        {demos.map((entry) => (
+          <DemoCard entry={entry} locale={locale} />
+        ))}
+      </div>
+    </section>
+  )}
+
+  {articles.length === 0 && demos.length === 0 && (
+    <p style="color: var(--color-text-muted);">{t.noContent}</p>
+  )}
+</BaseLayout>

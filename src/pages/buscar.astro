@@ -1,0 +1,52 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { ui, type Locale } from '@/lib/i18n';
+
+const locale: Locale = 'pt';
+const t = ui[locale];
+---
+
+<BaseLayout
+  locale={locale}
+  title={t.searchTitle}
+  description={t.searchTitle}
+  translations={{ pt: '/buscar', en: '/en/search' }}
+  indexable={false}
+>
+  <h1 class="mb-6 text-3xl font-bold" style="color: var(--color-text);">{t.searchTitle}</h1>
+
+  <div
+    id="search"
+    data-pagefind-ui
+    data-translations={JSON.stringify({
+      placeholder: t.searchPlaceholder,
+      clear_search: 'Limpar',
+      load_more: 'Carregar mais',
+      search_label: t.searchTitle,
+      filters_label: 'Filtros',
+      zero_results: 'Sem resultados para [SEARCH_TERM]',
+      many_results: '[COUNT] resultados para [SEARCH_TERM]',
+      one_result: '[COUNT] resultado para [SEARCH_TERM]',
+    })}
+  ></div>
+
+  <link rel="stylesheet" href="/pagefind/pagefind-ui.css" />
+  <script is:inline src="/pagefind/pagefind-ui.js"></script>
+  <script is:inline define:vars={{ lang: locale }}>
+    window.addEventListener('DOMContentLoaded', () => {
+      const el = document.getElementById('search');
+      const t = el ? JSON.parse(el.getAttribute('data-translations') || '{}') : {};
+      if (typeof window.PagefindUI !== 'undefined') {
+        new window.PagefindUI({
+          element: '#search',
+          showImages: false,
+          showSubResults: true,
+          translations: t,
+          baseUrl: '/',
+          processResult: (result) => result,
+          filters: { lang: [lang] },
+        });
+      }
+    });
+  </script>
+</BaseLayout>

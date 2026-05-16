@@ -1,0 +1,43 @@
+name: 🐛 Bug do site / Site bug
+description: Algo está quebrado na navegação, layout ou interatividade. / Something is broken in navigation, layout or interactivity.
+title: "[Bug] "
+labels: ["bug"]
+assignees:
+  - soucheff
+body:
+  - type: input
+    id: url
+    attributes:
+      label: URL afetada / Affected URL
+      placeholder: "https://soucheff.github.io/..."
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Navegador e SO / Browser and OS
+      placeholder: "Edge 138 / Windows 11"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportamento esperado / Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Comportamento observado / Observed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: console
+    attributes:
+      label: Erros no console / Console errors
+      render: shell
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot
+      description: Arraste/cole imagens aqui. / Drag/paste images here.

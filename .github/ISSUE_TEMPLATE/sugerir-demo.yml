@@ -1,0 +1,40 @@
+name: 🧪 Sugerir demo / Suggest demo
+description: Proponha uma demo conceitual ou prática. / Propose a conceptual or practical demo.
+title: "[Demo] "
+labels: ["content:demo", "enhancement"]
+assignees:
+  - soucheff
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideias para demos interativas são bem-vindas! / Interactive demo ideas are welcome!
+  - type: input
+    id: title
+    attributes:
+      label: Ideia / Idea
+      placeholder: Ex.: "Simulador de avaliação de risco de Conditional Access"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Descrição da funcionalidade / Functionality description
+      description: O que a demo faz? Qual problema/conceito ela ilustra? / What does the demo do? Which problem/concept does it illustrate?
+    validations:
+      required: true
+  - type: input
+    id: tech
+    attributes:
+      label: Stack proposta / Proposed stack
+      placeholder: "React, TypeScript, Astro"
+  - type: textarea
+    id: ux
+    attributes:
+      label: Esboço de UI / UI sketch
+      description: Descreva (ou anexe imagem) o fluxo da interface. / Describe (or attach an image) of the UI flow.
+  - type: textarea
+    id: inspirations
+    attributes:
+      label: Inspirações / Inspirations
+      description: Links de demos ou ferramentas similares. / Links to similar demos or tools.

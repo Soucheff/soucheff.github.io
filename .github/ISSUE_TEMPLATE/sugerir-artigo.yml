@@ -1,0 +1,53 @@
+name: 📝 Sugerir artigo / Suggest article
+description: Proponha um tema de artigo para o blog. / Propose an article topic for the blog.
+title: "[Artigo] "
+labels: ["content:article", "enhancement"]
+assignees:
+  - soucheff
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por sugerir um artigo! Preencha os campos abaixo. / Thanks for suggesting an article! Please fill in the fields below.
+  - type: input
+    id: title
+    attributes:
+      label: Título proposto / Proposed title
+      placeholder: Ex.: "Anatomia de um ataque de phishing contra Entra ID"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Descrição / Description
+      description: Em 3 a 5 linhas, descreva o que o artigo cobriria. / In 3–5 lines, describe what the article would cover.
+    validations:
+      required: true
+  - type: input
+    id: tags
+    attributes:
+      label: Tags sugeridas / Suggested tags
+      description: Lista separada por vírgulas, em lowercase-kebab-case. / Comma-separated, lowercase-kebab-case.
+      placeholder: "entra-id, phishing, zero-trust"
+  - type: dropdown
+    id: languages
+    attributes:
+      label: Idiomas desejados / Desired languages
+      multiple: true
+      options:
+        - Português (PT)
+        - English (EN)
+    validations:
+      required: true
+  - type: textarea
+    id: references
+    attributes:
+      label: Referências / References
+      description: Links para artigos, documentação ou whitepapers relacionados. / Links to related articles, docs or whitepapers.
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribuição / Contribution
+      options:
+        - label: Tenho interesse em escrever o artigo. / I'm interested in writing this article.
+        - label: Posso revisar tecnicamente. / I can technically review it.

@@ -1,0 +1,6 @@
+# Configuração do menu de "New issue" / Issue picker config
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discussões (Discussions)
+    url: https://github.com/soucheff/soucheff.github.io/discussions
+    about: Perguntas, ideias gerais e conversas — fora do escopo dos formulários abaixo. / Questions, general ideas and discussions outside the scope of the forms below.

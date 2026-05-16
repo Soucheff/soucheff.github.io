@@ -1,0 +1,47 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import type { Locale } from '@/lib/i18n';
+import { getLocalizedMeta, entryUrl, ui } from '@/lib/i18n';
+import TagBadge from './TagBadge.astro';
+
+interface Props {
+  entry: CollectionEntry<'articles'>;
+  locale: Locale;
+}
+
+const { entry, locale } = Astro.props;
+const meta = getLocalizedMeta(entry, locale);
+const href = entryUrl('articles', entry.slug, locale);
+const t = ui[locale];
+const formatter = new Intl.DateTimeFormat(locale === 'pt' ? 'pt-BR' : 'en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+});
+---
+
+<article class="card">
+  <header class="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+    <h3 class="m-0 text-lg font-bold">
+      <a href={href} class="no-underline" style="color: var(--color-text);">{meta.title}</a>
+    </h3>
+    <time
+      datetime={entry.data.pubDate.toISOString()}
+      class="text-xs"
+      style="color: var(--color-text-muted);"
+    >
+      {formatter.format(entry.data.pubDate)}
+    </time>
+  </header>
+  <p class="mb-3 text-sm" style="color: var(--color-text-muted);">{meta.description}</p>
+  {entry.data.tags.length > 0 && (
+    <div class="flex flex-wrap gap-1.5">
+      {entry.data.tags.map((tag) => (
+        <TagBadge tag={tag} locale={locale} />
+      ))}
+    </div>
+  )}
+  <p class="mt-3 text-sm">
+    <a href={href}>{t.readMore} →</a>
+  </p>
+</article>

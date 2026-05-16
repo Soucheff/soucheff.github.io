@@ -1,0 +1,104 @@
+---
+import '@/styles/global.css';
+import Header from '@/components/Header.astro';
+import Footer from '@/components/Footer.astro';
+import type { Locale } from '@/lib/i18n';
+import { ui } from '@/lib/i18n';
+
+interface Props {
+  locale: Locale;
+  title: string;
+  description?: string;
+  /** Mapa de URLs em outras línguas (para alternate links e LangSwitcher). */
+  translations?: Partial<Record<Locale, string>>;
+  /** Quando true, sinaliza ao Pagefind para indexar este body (default true). */
+  indexable?: boolean;
+  /** Sinaliza tipo de conteúdo para data-pagefind-filter. */
+  pagefindType?: 'article' | 'demo' | 'page';
+  ogImage?: string;
+}
+
+const {
+  locale,
+  title,
+  description,
+  translations,
+  indexable = true,
+  pagefindType = 'page',
+  ogImage,
+} = Astro.props;
+
+const t = ui[locale];
+const site = Astro.site?.toString().replace(/\/$/, '') ?? '';
+const canonical = `${site}${Astro.url.pathname}`;
+const ogImg = ogImage ?? `${site}/favicon.svg`;
+---
+
+<!doctype html>
+<html lang={locale === 'pt' ? 'pt-BR' : 'en-US'}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} — {t.siteName}</title>
+    <meta name="description" content={description ?? t.tagline} />
+    <meta name="author" content="Pedro Soucheff" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href={canonical} />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description ?? t.tagline} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImg} />
+    <meta property="og:locale" content={locale === 'pt' ? 'pt_BR' : 'en_US'} />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    {translations &&
+      Object.entries(translations).map(([loc, href]) => (
+        <link
+          rel="alternate"
+          hreflang={loc === 'pt' ? 'pt-BR' : 'en-US'}
+          href={`${site}${href}`}
+        />
+      ))}
+    {translations && <link rel="alternate" hreflang="x-default" href={`${site}${translations.pt ?? '/'}`} />}
+
+    <link rel="sitemap" href="/sitemap-index.xml" />
+
+    <!-- Script anti-flash: aplica o tema ANTES do CSS renderizar. -->
+    <script is:inline>
+      (() => {
+        try {
+          const stored = localStorage.getItem('theme');
+          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          const theme = stored ?? (prefersDark ? 'dark' : 'light');
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (_) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      })();
+    </script>
+  </head>
+
+  <body>
+    <a
+      href="#main-content"
+      class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-[color:var(--color-primary)] focus:px-3 focus:py-2 focus:text-white"
+    >
+      {locale === 'pt' ? 'Pular para o conteúdo' : 'Skip to content'}
+    </a>
+
+    <Header locale={locale} translations={translations} />
+
+    <main
+      id="main-content"
+      class="container-wide py-8"
+      data-pagefind-body={indexable ? '' : undefined}
+      data-pagefind-filter={indexable ? `lang:${locale},type:${pagefindType}` : undefined}
+    >
+      <slot />
+    </main>
+
+    <Footer locale={locale} />
+  </body>
+</html>

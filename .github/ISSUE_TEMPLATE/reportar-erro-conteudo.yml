@@ -1,0 +1,43 @@
+name: ✏️ Reportar erro de conteúdo / Report content issue
+description: Erro, imprecisão, link quebrado ou typo em artigo/demo. / Error, inaccuracy, broken link or typo in an article/demo.
+title: "[Conteúdo] "
+labels: ["content:fix"]
+assignees:
+  - soucheff
+body:
+  - type: input
+    id: url
+    attributes:
+      label: URL afetada / Affected URL
+      placeholder: "https://soucheff.github.io/artigos/zero-trust-entra"
+    validations:
+      required: true
+  - type: dropdown
+    id: language
+    attributes:
+      label: Idioma da página / Page language
+      options:
+        - Português (PT)
+        - English (EN)
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Tipo de erro / Type of error
+      options:
+        - Erro de digitação / Typo
+        - Link quebrado / Broken link
+        - Código incorreto / Incorrect code
+        - Imprecisão técnica / Technical inaccuracy
+        - Conteúdo desatualizado / Outdated content
+        - Outro / Other
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Detalhes / Details
+      description: Cite o trecho com erro e descreva a correção sugerida. / Quote the incorrect snippet and describe the suggested fix.
+    validations:
+      required: true
