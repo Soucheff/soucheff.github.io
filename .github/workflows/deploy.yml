@@ -14,11 +14,11 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
-env:
+#env:
   # Safety net: force JS-based actions to Node.js 24.
   # Node 20 deprecated by GitHub Actions; removed 2026-09-16.
   # https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  # FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   build:
