@@ -13,7 +13,8 @@
     "build:fast": "astro build && node scripts/postbuild-i18n-pagefind.mjs && pagefind --site dist",
     "preview": "astro preview",
     "astro": "astro",
-    "check": "astro check"
+    "check": "astro check",
+    "optimize:images": "node scripts/optimize-images.mjs"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.4",
@@ -45,5 +46,8 @@
     "typescript": "^5.7.2",
     "unified": "^11.0.5",
     "unist-util-visit": "^5.0.0"
+  },
+  "devDependencies": {
+    "sharp": "^0.33.5"
   }
 }
