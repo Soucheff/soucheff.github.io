@@ -37,9 +37,21 @@ const isActive = (href: string) => {
   style="background-color: var(--color-surface);"
 >
   <div class="container-wide flex flex-wrap items-center gap-4 py-4">
-    <a href={homeHref} class="flex items-center gap-2 text-base font-bold no-underline" style="color: var(--color-text);">
-      <img src="/favicon.svg" alt="" width="28" height="28" />
-      <span>{t.siteName}</span>
+    <a
+      href={homeHref}
+      class="flex items-center no-underline"
+      style="color: var(--color-text);"
+      aria-label={t.siteName}
+    >
+      <img
+        src="/images/brand/soucheff-logo.png"
+        alt={t.siteName}
+        width="60"
+        height="40"
+        class="h-10 w-auto rounded-md bg-white px-2 py-1"
+        loading="eager"
+        decoding="async"
+      />
     </a>
 
     <nav aria-label="primary" class="ml-auto flex flex-wrap items-center gap-1">
