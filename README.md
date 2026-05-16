@@ -134,6 +134,29 @@ Prefira `client:visible` para componentes pesados.
 
 ---
 
+## Imagens e assets
+
+Imagens dos artigos vivem em `public/images/articles/<slug>/` e são referenciadas por caminho
+absoluto (ex.: `/images/articles/modern-auth-01/basicAuth-Flow.png`). Imagens externas (YouTube
+thumbnails, diagramas hospedados em outro lugar) podem ser usadas via URL direta.
+
+### Otimizar imagens
+
+O repositório inclui um otimizador baseado em [sharp](https://sharp.pixelplumbing.com) que
+redimensiona (largura máxima de 1600 px) e recomprime PNG/JPEG **in-place**, substituindo o
+original apenas se o resultado ficar menor (idempotente — seguro para rodar várias vezes):
+
+```powershell
+npm run optimize:images
+```
+
+O script percorre `public/images/**/*.{png,jpg,jpeg}`, aplica paleta + compressão nível 9 em
+PNGs e mozjpeg q82 progressivo em JPEGs, e imprime um relatório de redução por arquivo. Rode
+antes de commitar imagens novas — em PNGs de diagrama é típico ver **-65% a -77%** de redução
+sem perda visual perceptível.
+
+---
+
 ## Rodando localmente
 
 ```powershell
@@ -161,7 +184,8 @@ soucheff.github.io/
 │   └── pull_request_template.md
 ├── public/                         # assets estáticos (favicon, robots, imagens)
 ├── scripts/
-│   └── postbuild-i18n-pagefind.mjs # injeta data-pagefind-ignore por idioma
+│   ├── postbuild-i18n-pagefind.mjs # injeta data-pagefind-ignore por idioma
+│   └── optimize-images.mjs         # otimizador PNG/JPEG via sharp (npm run optimize:images)
 ├── src/
 │   ├── components/                 # Header, Footer, ThemeToggle, Cards, demo/*
 │   ├── content/
