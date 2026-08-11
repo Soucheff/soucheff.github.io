@@ -11,6 +11,7 @@ import rehypeExternalLinks from 'rehype-external-links';
 import rehypeMermaid from 'rehype-mermaid';
 
 import { remarkI18nDirective } from './src/lib/remark-i18n-directive.mjs';
+import { rehypeMermaidShiki } from './src/lib/rehype-mermaid-shiki.mjs';
 
 export default defineConfig({
   site: 'https://soucheff.github.io',
@@ -36,12 +37,12 @@ export default defineConfig({
       [
         rehypeAutolinkHeadings,
         {
-          behavior: 'append',
-          properties: { className: ['heading-anchor'], ariaHidden: 'true', tabIndex: -1 },
-          content: { type: 'text', value: '#' },
+          behavior: 'wrap',
+          properties: { className: ['heading-link'] },
         },
       ],
       [rehypeExternalLinks, { target: '_blank', rel: ['nofollow', 'noopener', 'noreferrer'] }],
+      rehypeMermaidShiki,
       [rehypeMermaid, { strategy: 'inline-svg', dark: true }],
     ],
   },

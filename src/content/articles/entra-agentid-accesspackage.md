@@ -13,9 +13,14 @@ i18n:
     pt:
         title: Acesso sob demanda para agentes de IA com Microsoft Entra Agent ID e ID Governance
         description: Demonstração de um agente autônomo que solicita, justifica e recebe acesso temporário por meio de um Access Package do Microsoft Entra ID Governance.
+    en:
+        title: On-demand access for AI agents with Microsoft Entra Agent ID and ID Governance
+        description: Demonstration of an autonomous agent that requests, justifies, and receives temporary access through a Microsoft Entra ID Governance Access Package.
 ---
 
 <!-- markdownlint-disable MD013 MD025 -->
+
+:::lang{pt}
 
 # Acesso sob demanda para agentes de IA com Microsoft Entra Agent ID e Microsoft Entra ID Governance
 
@@ -958,3 +963,955 @@ Documentação consultada e validada em 10 de agosto de 2026:
 - [Ollama: Structured Outputs](https://docs.ollama.com/capabilities/structured-outputs)
 - [Ollama: Thinking](https://docs.ollama.com/capabilities/thinking)
 - [Ollama model library: gpt-oss](https://ollama.com/library/gpt-oss)
+
+:::
+
+:::lang{en}
+
+# On-demand access for AI agents with Microsoft Entra Agent ID and Microsoft Entra ID Governance
+
+![Demonstration overview](/images/articles/entra-agent-governance/banner.png)
+
+> **Summary:** this article demonstrates an autonomous agent with its own identity in
+> Microsoft Entra. When it receives a task, the agent interprets the objective, selects a
+> capability from the access catalog, and checks whether it is already authorized to use
+> it. Only when it concludes that the permission is necessary and has not yet been granted
+> does it request an Access Package for its own identity, provide the rationale for the
+> decision, and wait for human approval. The call that initially returns **HTTP 403**
+> returns **HTTP 200** after the temporary permission is delivered.
+>
+> **Product status:** governance of Agent IDs through Access Packages is in **preview**.
+> The behavior described here was validated in a real tenant on **August 9, 2026**. Confirm
+> licensing, APIs, and limitations in the official documentation before using this pattern
+> in production.
+
+## Contents
+
+1. [Motivation](#1-motivation)
+2. [Demonstrated scenario](#2-demonstrated-scenario)
+3. [Identity decision](#3-identity-decision)
+4. [Architecture and responsibilities](#4-architecture-and-responsibilities)
+5. [Licensing and prerequisites](#5-licensing-and-prerequisites)
+6. [Implementation](#6-implementation)
+7. [Observed results](#7-observed-results)
+8. [Security and path to production](#8-security-and-path-to-production)
+9. [Troubleshooting](#9-troubleshooting)
+10. [How to run](#10-how-to-run)
+11. [Conclusion](#11-conclusion)
+12. [References](#12-references)
+
+---
+
+## 1. Motivation
+
+As AI agents take on tasks with greater autonomy, they begin to interact with APIs, data,
+and corporate resources. Querying a directory, generating a report, or operating an
+internal system requires more than authentication: it requires a clear answer to four
+governance questions.
+
+- **Who performed the action?**
+- **What access was required?**
+- **Who approved that access?**
+- **When should the grant end?**
+
+A conventional user account was designed for human authentication and lifecycle patterns.
+A conventional service principal identifies an application, but by itself it does not
+provide the context specific to an agent: a responsible sponsor, dedicated identity,
+platform-specific restrictions, and a lifecycle controlled by a blueprint.
+
+Microsoft Entra Agent ID provides this specific identity. Together, Microsoft Entra ID
+Governance can turn a permanent permission into an on-demand access process: the agent
+starts without authorization, provides a justification, waits for a human decision, and
+receives a temporary, auditable grant.
+
+That is the objective of the demonstration: apply the principle of **least privilege** to a
+non-human identity that makes decisions autonomously.
+
+---
+
+## 2. Demonstrated scenario
+
+The agent's task is to query users in Microsoft Graph to produce an onboarding report. The
+operation selected as proof is:
+
+```http
+GET https://graph.microsoft.com/v1.0/users?$top=1
+```
+
+The expected flow is:
+
+1. The agent compares the task with the catalog of governed capabilities.
+2. The local model decides whether the task requires access and which permission fulfills it.
+3. If access is not required, the flow ends without obtaining a token or querying Graph.
+4. If access is required, the agent obtains an app-only token using its **Agent Identity**
+    and checks the selected capability.
+5. Without `User.Read.All`, the Graph call returns **403**.
+6. The agent creates an `accessPackageAssignmentRequest` for its own identity, including
+    the rationale for the decision.
+7. The Access Package policy routes the request for approval.
+8. The sponsor approves it in the My Access portal.
+9. Entitlement Management delivers `User.Read.All` with the configured expiration.
+10. A new token contains `roles: ["User.Read.All"]`.
+11. The same Graph call returns **200**.
+
+![Before-and-after proof](/images/articles/entra-agent-governance/dashboard-antes-depois.png)
+
+The application uses:
+
+- **React + Vite** on the frontend;
+- **FastAPI + httpx** on the backend;
+- **Ollama** with `gpt-oss:20b` for the access decision;
+- **Microsoft Entra ID Auth SDK sidecar** for token acquisition;
+- **Docker Compose** to run the demonstration locally.
+
+---
+
+## 3. Identity decision
+
+The first step is not choosing the agent framework. It is choosing the identity type.
+
+Current Microsoft Entra guidance distinguishes:
+
+| Type | When to use |
+| --- | --- |
+| **Agent Identity** | When the agent acts on its own behalf or participates in autonomous/interactive operations |
+| **Agent's user account** | When the resource requires a user object, such as a mailbox or Teams channel |
+| **Conventional service principal** | For deterministic and static workloads without agent-specific governance capabilities |
+| **Conventional user account** | Not recommended for representing an agent |
+
+In this demonstration, the resource is a **Microsoft Graph application permission**. There
+is no need for a mailbox, UPN, or another resource that requires a user object. Therefore,
+the architecture uses:
+
+- an **Agent Identity**;
+- the **autonomous** operation pattern;
+- an app-only token;
+- **no Agent User Account**.
+
+The recommendation is also to use one identity per logical agent and one blueprint per
+trust boundary. Because there is a single agent in a single runtime, the demo uses one
+blueprint and one Agent Identity.
+
+---
+
+## 4. Architecture and responsibilities
+
+```mermaid
+flowchart LR
+    UI[React frontend] -->|SSE| API[FastAPI backend]
+    API -->|prompt| LLM[Local Ollama]
+    API -->|Host: localhost| SIDECAR[Entra Auth SDK sidecar]
+    SIDECAR -->|Agent ID token| ENTRA[(Microsoft Entra)]
+    API -->|GET /users as agent| GRAPH[(Microsoft Graph)]
+    API -->|state query and reset| EM[(Entitlement Management)]
+    SPONSOR((Human sponsor)) -->|approves in My Access| EM
+    EM -->|temporary User.Read.All| ENTRA
+```
+
+The demo separates two responsibilities:
+
+| Identity | Responsibility | Privilege in this implementation |
+| --- | --- | --- |
+| **Agent Identity** | Call Graph and request its own Access Package | Starts without `User.Read.All`; does not receive `EntitlementManagement.ReadWrite.All` |
+| **Control/provisioning application** | Create the Agent ID objects, query the timeline, and remove the assignment during reset | Has broad administrative permissions to simplify the demo |
+
+This concentration of responsibilities is a simplification for the demonstration, not a
+production recommendation. To reduce the number of components, the same application
+handles provisioning, observability, and reset operations. In production, use separate
+identities for each function and assign only the required Entitlement Management roles,
+such as **Access package assignment manager**, instead of granting broad administrative
+permissions to a single application.
+
+---
+
+## 5. Licensing and prerequisites
+
+### 5.1 Licensing
+
+To assess licensing for this scenario, consider two dimensions:
+
+1. a base product that includes Microsoft Entra ID P1 or P2; and
+2. an offering that includes governance capabilities for agents, such as Microsoft
+    Agent 365.
+
+| Reference | Usage |
+| --- | --- |
+| **Microsoft 365 E7** | Offering identified by Microsoft as including Agent 365 and Microsoft Entra Suite; confirm the terms applicable to the tenant |
+| **Microsoft Agent 365 + Microsoft Entra ID P2 or Microsoft 365 E5** | Alternative to assess when the tenant also uses additional capabilities for human identities |
+
+The **Microsoft Agent 365** license enables the following capabilities:
+
+- Agent IDs and service principals as Access Package targets;
+- API permissions in Access Packages;
+- requests submitted by the sponsor on behalf of the agent;
+- Agent Sponsors as approvers;
+- assignment expiration;
+- My Access experiences applicable to the flow.
+
+### 5.2 Administrative roles
+
+An **Identity Governance Administrator** is sufficient to create the Access Package in many
+scenarios. In this demonstration, however, the package includes an OAuth application
+permission. To add **API permissions** or directory roles to the package, the documentation
+requires **Global Administrator**. The catalog is then considered privileged.
+
+To create and manage Agent ID objects, use one of the supported roles, such as:
+
+- **Agent Identity Developer**;
+- **Agent Identity Administrator**;
+- **Application Administrator**, depending on the operation.
+
+### 5.3 Local tools
+
+- Docker Desktop;
+- Python 3.12 or later;
+- Azure CLI authenticated to the tenant;
+- Ollama on `localhost:11434`;
+- the `gpt-oss:20b` model available in Ollama;
+- Node.js only if the frontend runs outside the container.
+
+### 5.4 Provisioning application permissions
+
+The demo automates setup with a dedicated application using the `client_credentials` flow.
+It receives Microsoft Graph permissions to create blueprints, principals, Agent Identities,
+and Entitlement Management objects.
+
+The configured permissions include:
+
+```text
+AgentIdentityBlueprint.Create
+AgentIdentityBlueprint.ReadWrite.All
+AgentIdentityBlueprint.AddRemoveCreds.All
+AgentIdentityBlueprintPrincipal.Create
+AgentIdentity.Create.All
+AgentIdentity.ReadWrite.All
+Application.ReadWrite.All
+Directory.Read.All
+EntitlementManagement.ReadWrite.All
+```
+
+> This set favors reproducibility of the demonstration, not least privilege for a final
+> deployment. Separate the processes and reduce the permissions for each responsibility
+> in production.
+
+---
+
+## 6. Implementation
+
+### 6.1 Project structure
+
+```text
+backend/                 # FastAPI, Graph/sidecar/Ollama clients, and orchestration
+frontend/                # React dashboard + EventSource
+provisioning/            # blueprint, principal, and Agent Identity creation
+scripts/                 # supporting demonstration automation
+docker-compose.yml       # sidecar + backend + frontend
+README.md                # project requirements and operational instructions
+```
+
+The central files are `provisioning/provision_agent.py`,
+`backend/app/entitlement.py`, `backend/app/demo_flow.py`, `backend/app/ollama.py`, and
+`frontend/src/App.jsx`. The following excerpts have been shortened to highlight the
+relevant decisions; see the
+[demonstration repository](https://github.com/Soucheff/Microsoft-Entra-AgentID-IGA)
+for error handling and execution details.
+
+### 6.2 Provisioning process authentication
+
+The Agent ID APIs are called with a dedicated application, not with the Azure CLI token.
+The helper uses `ClientSecretCredential` and requests Graph's `.default` scope:
+
+```python
+from azure.identity import ClientSecretCredential
+
+
+def graph_token() -> str:
+    credential = ClientSecretCredential(
+        tenant_id=env("AZURE_TENANT_ID"),
+        client_id=env("AZURE_CLIENT_ID"),
+        client_secret=env("AZURE_CLIENT_SECRET"),
+    )
+    return credential.get_token("https://graph.microsoft.com/.default").token
+```
+
+The script does not reuse the session created by `az login`. The token issued to Azure CLI
+includes the broad delegated permission `Directory.AccessAsUser.All`; for security, the
+Agent ID APIs reject tokens that contain this permission and return HTTP 403.
+
+For this reason, the demonstration uses a dedicated application and the app-only
+`client_credentials` flow. In this flow, the `.default` scope includes in the token the
+Microsoft Graph application permissions previously configured and consented for this
+identity, such as the specific permissions to create and manage Agent IDs. This approach
+also enables non-interactive execution and clearly identifies in the logs which application
+performed the provisioning.
+
+### 6.3 Blueprint, BlueprintPrincipal, and Agent Identity
+
+The object model is:
+
+```text
+Agent Identity Blueprint (application)
+└── BlueprintPrincipal (service principal)
+    └── Agent Identity (specialized service principal)
+```
+
+The BlueprintPrincipal is **not created automatically**. The script creates or reuses each
+object so that execution is idempotent.
+
+```python
+BLUEPRINT_NAME = "IGA Agent Demo Blueprint"
+AGENT_NAME = "iga-demo-agent-01"
+
+
+def create_blueprint(token: str, sponsor_id: str) -> dict:
+    body = {
+        "@odata.type": "Microsoft.Graph.AgentIdentityBlueprint",
+        "displayName": BLUEPRINT_NAME,
+        "sponsors@odata.bind": [f"{GRAPH_BETA}/users/{sponsor_id}"],
+    }
+    return request("POST", f"{GRAPH_BETA}/applications", token, json=body).json()
+
+
+def create_blueprint_principal(token: str, blueprint_app_id: str) -> None:
+    body = {
+        "@odata.type": "Microsoft.Graph.AgentIdentityBlueprintPrincipal",
+        "appId": blueprint_app_id,
+    }
+    request("POST", f"{GRAPH_BETA}/servicePrincipals", token, json=body)
+
+
+def create_agent_identity(token: str, blueprint_app_id: str, sponsor_id: str) -> dict:
+    body = {
+        "@odata.type": "Microsoft.Graph.AgentIdentity",
+        "displayName": AGENT_NAME,
+        "agentIdentityBlueprintId": blueprint_app_id,
+        "sponsors@odata.bind": [f"{GRAPH_BETA}/users/{sponsor_id}"],
+    }
+    return request("POST", f"{GRAPH_BETA}/servicePrincipals", token, json=body).json()
+```
+
+The sponsor must be a user. In addition, propagation between creation of the blueprint,
+principal, and Agent Identity is not instantaneous. The helper handles transient errors
+with backoff:
+
+```python
+delay = 4.0
+for attempt in range(retries):
+    response = requests.request(method, url, headers=headers(token), timeout=30, **kwargs)
+    if response.status_code < 400:
+        return response
+    if is_transient(response) and attempt < retries - 1:
+        time.sleep(delay)
+        delay = min(delay * 1.7, 40)
+        continue
+    return response
+```
+
+![Agent ID objects in Microsoft Entra](/images/articles/entra-agent-governance/agent-id-objects.png)
+
+### 6.4 Create the Access Package
+
+In the Microsoft Entra admin center:
+
+1. Go to **ID Governance > Entitlement management > Access packages**.
+2. Create or select a catalog.
+3. Add `User.Read.All` as a **Microsoft Graph application permission**.
+4. Under **Who can get access**, select:
+   - **For users, service principals, and agent identities in your directory**;
+   - **All agents**.
+5. Enable requests by the target itself.
+6. Require justification and at least one approval stage.
+7. Set the assignment duration. In the demo, the request uses `PT4H`.
+
+![User.Read.All permission in the Access Package](/images/articles/entra-agent-governance/access-package-api-permission.png)
+
+![Policy with All agents scope](/images/articles/entra-agent-governance/access-package-all-agents.png)
+
+The distinction between **All agents** and **All service principals** is important. The
+documentation recommends the first option for Agent IDs and the second for agents
+represented by conventional service principals.
+
+In the tenant used for the test, reading the policy returned:
+
+```text
+allowedTargetScope = allDirectoryAgentIdentities
+```
+
+This value did not appear in the public enumeration in the v1.0 reference consulted during
+the test. Treat it as observed preview behavior, not as a stable automation contract.
+
+### 6.5 Configure the authentication sidecar
+
+The Microsoft Entra ID Auth SDK sidecar allows the backend to obtain the Agent Identity
+token over HTTP. In the local environment, the credential is stored on the blueprint:
+
+```yaml
+sidecar:
+  image: mcr.microsoft.com/entra-sdk/auth-sidecar:1.0.0-azurelinux3.0-distroless
+  container_name: iga-sidecar
+  environment:
+    AzureAd__Instance: https://login.microsoftonline.com/
+    AzureAd__TenantId: ${AZURE_TENANT_ID}
+    AzureAd__ClientId: ${BLUEPRINT_APP_ID}
+    AzureAd__ClientCredentials__0__SourceType: ClientSecret
+    AzureAd__ClientCredentials__0__ClientSecret: ${BLUEPRINT_SECRET}
+    DownstreamApis__Graph__BaseUrl: https://graph.microsoft.com/v1.0/
+    DownstreamApis__Graph__Scopes__0: https://graph.microsoft.com/.default
+    DownstreamApis__Graph__RequestAppToken: "true"
+    ASPNETCORE_URLS: http://+:5000
+```
+
+The endpoint used is the one intended for operations without user context:
+
+```python
+SIDECAR_HEADERS = {"Host": "localhost"}
+
+
+async def agent_auth_header(client: httpx.AsyncClient) -> str:
+    response = await client.get(
+        f"{SIDECAR_URL}/AuthorizationHeaderUnauthenticated/Graph",
+        params={"AgentIdentity": AGENT_APP_ID},
+        headers=SIDECAR_HEADERS,
+        timeout=30,
+    )
+    response.raise_for_status()
+    return response.json()["authorizationHeader"]
+```
+
+The `AgentIdentity` parameter by itself represents the autonomous pattern. The
+`Host: localhost` header is an adaptation for this demo's topology: the sidecar applies
+host filtering and rejected the Docker service hostname (`sidecar`) with
+`400 Invalid Hostname`.
+
+> Do not publish the sidecar through an ingress, load balancer, or external endpoint. It
+> must remain local to the workload or within the trusted internal network.
+
+### 6.6 Prove the absence of access
+
+The backend uses the agent token to perform the proof operation:
+
+```python
+async def probe_users(client: httpx.AsyncClient, agent_auth: str) -> int:
+    response = await client.get(
+        "https://graph.microsoft.com/v1.0/users?$top=1",
+        headers={"Authorization": agent_auth},
+        timeout=15,
+    )
+    return response.status_code
+```
+
+Before assignment, the token does not contain `User.Read.All`, and Graph returns:
+
+```text
+HTTP 403
+Authorization_RequestDenied
+Insufficient privileges to complete the operation.
+```
+
+### 6.7 The agent decides whether it needs access
+
+The local model is not used merely to draft text. It is the agent's decision component.
+The input contains:
+
+- the assigned task;
+- the permissions the organization has published in the entitlement catalog;
+- the explicit instruction to apply least privilege.
+
+The model must return a structured decision:
+
+```json
+{
+    "requires_access": true,
+  "permission": "User.Read.All",
+    "reason": "The task requires reading directory user profiles.",
+  "justification": "The task requires enumerating directory users..."
+}
+```
+
+The backend uses `/api/chat`, the `gpt-oss:20b` `low` reasoning mode, and a JSON Schema.
+The reasoning trace is stored in `message.thinking`; only the final structured decision in
+`message.content` is processed.
+
+```python
+DECISION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "requires_access": {"type": "boolean"},
+        "permission": {
+            "type": ["string", "null"],
+            "enum": ["User.Read.All", None],
+        },
+        "reason": {"type": "string"},
+        "justification": {"type": ["string", "null"]},
+    },
+    "required": ["requires_access", "permission", "reason", "justification"],
+    "additionalProperties": False,
+}
+
+
+async def analyze_access_need(client, task: str) -> AccessDecision:
+    response = await client.post(
+        f"{OLLAMA_URL}/api/chat",
+        json={
+            "model": OLLAMA_MODEL,
+            "messages": [{"role": "user", "content": build_prompt(task)}],
+            "format": DECISION_SCHEMA,
+            "think": "low",
+            "stream": False,
+            "options": {"temperature": 0},
+        },
+        timeout=240,
+    )
+    payload = json.loads(response.json()["message"]["content"])
+    return validate_decision(payload)
+```
+
+Validation accepts only the permission published by the application (`User.Read.All`). If
+the model chooses another permission, omits the justification, or returns invalid JSON,
+the decision is rejected.
+
+The failure pattern is **safe deny**: if Ollama is unavailable, the agent does not request
+access. There is no fallback text that automatically creates a request.
+
+Two tests confirm the behavior:
+
+| Task | Agent decision |
+| --- | --- |
+| Enumerate users for an onboarding report | The task requires `User.Read.All` |
+| Calculate `21 + 21` without using corporate data | The task does not require cataloged access |
+
+Therefore, the existence of an available Access Package is not sufficient reason to use
+it. The task must require the capability. Only then does the agent check authorization:
+HTTP 200 ends the flow without duplicating requests; HTTP 403 proves that the grant is
+absent.
+
+### 6.8 The agent requests its own access
+
+The Agent ID governance documentation provides for the Agent Identity itself to request an
+Access Package programmatically. This step is performed only when the validated decision
+contains `requires_access=true` **and** the capability check returns HTTP 403. The
+justification is a consequence of the analysis, not the trigger for the process. The body
+that worked in this implementation was:
+
+```python
+from datetime import UTC, datetime
+
+
+async def submit_self_request(client, agent_auth: str, justification: str) -> dict:
+    body = {
+        "requestType": "userAdd",
+        "justification": justification,
+        "assignment": {
+            "accessPackageId": ACCESS_PACKAGE_ID,
+            "assignmentPolicyId": ASSIGNMENT_POLICY_ID,
+            "targetId": AGENT_OBJECT_ID,
+        },
+        "schedule": {
+            "startDateTime": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "expiration": {
+                "type": "afterDuration",
+                "duration": "PT4H",
+            },
+        },
+    }
+    response = await client.post(
+        f"{GRAPH_V1}/identityGovernance/entitlementManagement/assignmentRequests",
+        headers={
+            "Authorization": agent_auth,
+            "Content-Type": "application/json",
+        },
+        json=body,
+        timeout=30,
+    )
+    response.raise_for_status()
+    return response.json()
+```
+
+Critical points:
+
+- `targetId` is the **object ID of the specialized Agent Identity service principal**, not
+  the `appId`;
+- `userAdd` was the type accepted in the self-service flow;
+- the policy must allow self-add and include **All agents**;
+- the `schedule` can customize the duration only if the policy allows a custom schedule.
+
+#### Note about permissions in preview
+
+The general endpoint reference lists `EntitlementManagement.ReadWrite.All` as an application
+permission. However, when this scenario was validated, the Agent Identity token did not
+contain that role, and the self-request was accepted when the policy was configured for
+**All agents**. The Agent ID-specific documentation confirms that the agent itself can
+request the package but does not detail this authorization contract.
+
+Therefore:
+
+- consider the result **evidence of preview behavior validated in this tenant**;
+- do not grant `EntitlementManagement.ReadWrite.All` to the agent merely to work around an
+  incorrect policy configuration;
+- validate the same flow in the target tenant before adopting it as a standard.
+
+### 6.9 Approval and state tracking
+
+After the POST, the request moves through the states:
+
+```text
+submitted -> pendingApproval -> delivering -> delivered
+```
+
+The sponsor receives the request in My Access and sees the justification generated by the
+agent.
+
+![Approval in My Access](/images/articles/entra-agent-governance/myaccess-aprovacao.png)
+
+The demo queries the state with the control application:
+
+```python
+async def request_state(client, token: str, request_id: str) -> str | None:
+    url = (
+        f"{EM}/assignmentRequests"
+        f"?$filter=id eq '{request_id}'&$select=id,state,status"
+    )
+    response = await client.get(
+        url,
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=15,
+    )
+    items = response.json().get("value", [])
+    return items[0].get("state") if items else None
+```
+
+### 6.10 Renew the token and prove access
+
+When the assignment is delivered, the app role assignment is created for the Agent
+Identity. The token already in the sidecar cache remains without the new role until it is
+renewed.
+
+To avoid waiting for natural expiration during a demonstration, the backend restarts the
+sidecar container:
+
+```python
+def restart_sidecar() -> bool:
+    import docker
+
+    docker.from_env().containers.get(SIDECAR_CONTAINER).restart()
+    return True
+```
+
+This is a **local demo convenience**, not an Agent ID architectural requirement. In
+production, do not mount the Docker socket in the backend. Use a design that allows natural
+or controlled token renewal without granting access to the Docker daemon.
+
+The new token contains:
+
+```json
+{
+  "roles": ["User.Read.All"]
+}
+```
+
+The same `GET /users?$top=1` call returns **HTTP 200**.
+
+### 6.11 Stream the timeline to the frontend
+
+The backend publishes events through Server-Sent Events (SSE):
+
+```python
+@app.get("/api/run")
+async def run(task: str) -> StreamingResponse:
+    async def stream():
+        async for event in run_demo(task):
+            yield f"data: {json.dumps(event)}\n\n"
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+```
+
+In React, `EventSource` updates the timeline:
+
+```jsx
+const source = new EventSource(`${API}/api/run?task=${encodeURIComponent(task)}`);
+
+source.onmessage = (message) => {
+  const event = JSON.parse(message.data);
+  setSteps((current) => ({ ...current, [event.step]: event }));
+
+    if (event.step === "reasoning") {
+        setDecision({
+            requiresAccess: event.requiresAccess,
+            permission: event.permission,
+            reason: event.reason,
+            justification: event.justification,
+        });
+    }
+  if (event.step === "probe_before") setBeforeStatus(event.httpStatus);
+  if (event.step === "probe_after") setAfterStatus(event.httpStatus);
+  if (event.step === "complete" || event.status === "error") source.close();
+};
+```
+
+![Demonstration timeline](/images/articles/entra-agent-governance/dashboard-timeline.png)
+
+---
+
+## 7. Observed results
+
+Validation in the tenant produced the following evidence:
+
+| Stage | Evidence |
+| --- | --- |
+| Initial token | `oid` and `appid` matched the Agent Identity; `roles` was absent |
+| Initial call | `GET /users` returned **403 Authorization_RequestDenied** |
+| Positive decision | For the onboarding report, the agent selected `User.Read.All` and justified the request |
+| Negative decision | For an arithmetic task without corporate data, the agent decided not to request access |
+| Request | `userAdd` with the Agent Identity `targetId` returned success |
+| Governance | State changed to `pendingApproval` |
+| Approval | Sponsor approved through My Access |
+| Delivery | `User.Read.All` appeared in the Agent Identity app role assignment |
+| New token | The `roles` claim began to contain `User.Read.All` |
+| Final call | `GET /users` returned **200** |
+
+The two decision tests are as important as the `403 -> 200`: they demonstrate that the
+agent does not request a package merely because it exists. The task must require the
+capability published in the catalog. When the request is necessary, the policy determines
+eligibility, approval, and duration.
+
+### 7.1 Auditing and evidence correlation
+
+The demonstration makes it possible to observe the flow across three complementary layers:
+
+| Source | Available evidence |
+| --- | --- |
+| **Demo dashboard** | Agent decision, selected permission, justification, HTTP status, `requestId`, and state transitions |
+| **Entitlement Management audit logs** | Request creation, approval, delivery preparation, and assignment changes |
+| **Microsoft Entra sign-in logs** | Authentications associated with the Agent Identity, accessed resource, result, and agent identifiers |
+
+On the dashboard, the SSE events form an operational trail of the execution and help
+correlate the agent's decision with the `requestId` returned by Entitlement Management.
+This timeline is visual evidence from the demo, but it is not a substitute for durable
+audit storage.
+
+In the Microsoft Entra admin center, go to **ID Governance > Entitlement management > Audit
+logs** and filter by the `EntitlementManagement` and `UserManagement` categories. Expected
+events include the Access Package request, creation of the approval, the approver's
+decision, and delivery preparation.
+
+![Request and approval audit](/images/articles/entra-agent-governance/auditoria-logs.png)
+
+To examine agent authentication, go to **Entra ID > Monitoring & health > Sign-in logs**
+and use the **Is Agent = Yes** and **Agent type = Agent Identity** filters. These records
+help confirm which identity authenticated, which resource was accessed, and whether the
+operation completed successfully.
+
+Microsoft Graph calls can also be correlated in Advanced Hunting. The following capture
+shows the `GET /users` operation with `User.Read.All` and an HTTP 200 response.
+
+![Microsoft Graph call in Advanced Hunting](/images/articles/entra-agent-governance/auditLog-MSGraph.png)
+
+To correlate the three layers, preserve at least:
+
+- the execution date and time;
+- the Agent Identity `appId` and object ID;
+- the Access Package request `requestId`;
+- the requested permission and justification;
+- the approver identity and decision;
+- the results of the calls before and after the grant.
+
+In production, send this data to a central observability platform, apply retention policies,
+and avoid logging tokens, secrets, or other sensitive data.
+
+---
+
+## 8. Security and path to production
+
+This solution was built to make the governance flow explicit. Some components are
+intentionally simplified.
+
+### 8.1 What to retain
+
+- one Agent Identity per logical agent;
+- a responsible human sponsor;
+- Access Packages specific to agents;
+- **All agents** scope or specific targets;
+- structured decisions validated against a closed permission catalog;
+- a safe deny pattern when the model is unavailable or produces invalid output;
+- mandatory justification;
+- short expiration;
+- separation between the agent identity and the control plane;
+- retries with backoff and log correlation.
+
+### 8.2 What to replace
+
+| Local demo | Production |
+| --- | --- |
+| Client secret on the blueprint | Managed Identity + Workload Identity Federation |
+| Provisioning application also used to monitor/reset | Separate identities and delegated Entitlement Management roles |
+| Docker socket in the backend | Token renewal without access to the Docker daemon |
+| Open CORS | Explicit origins and authentication on frontend/backend |
+| State only in memory/SSE | Persistence, idempotency, and session recovery |
+| Polling every few seconds | Backoff, limits, and telemetry |
+
+### 8.3 Access Package limitations for agents
+
+In the current documentation, Access Packages for Agent IDs can include:
+
+- security group membership;
+- OAuth API permissions, including Microsoft Graph;
+- Microsoft Entra roles allowed for agents.
+
+Do not reuse packages that contain application roles, SAP roles, or SharePoint site roles
+for this scenario because those resources are not supported for Agent Identities and
+service principals through this path.
+
+---
+
+## 9. Troubleshooting
+
+| Symptom | Likely cause | Action |
+| --- | --- | --- |
+| `403` when calling `/users` before approval | Expected behavior | Confirm that the token does not contain `User.Read.All` |
+| `No valid policy was found` | Policy set to **All service principals**, not **All agents** | Change the target scope to **All agents** |
+| `Grant null` in the request | Incorrect shape or no matching policy | Use the correct `assignment.targetId`, policy ID, and object ID |
+| `InvalidRequestExistingGrant` | An assignment already exists or removal is still processing | Wait for asynchronous removal before retrying |
+| `400 Invalid Hostname` in the sidecar | Host filtering rejected `sidecar:5000` | Send `Host: localhost` or use a local network namespace |
+| New token still lacks `User.Read.All` | Cache or propagation | Renew the token; in the demo, restart the sidecar |
+| Agent decides not to request and `usedLlm=false` | Ollama unavailable, invalid JSON, or unsupported permission | Check `/api/tags`, the `gpt-oss:20b` model, and the logs; blocking is intentional (safe deny) |
+| Model chooses permission outside the catalog | Output not permitted by the JSON Schema/validator | Publish the permission in the application catalog or keep the decision denied |
+| Agent creation fails with `object not found` | Blueprint/principal propagation | Apply retries with backoff |
+| Access Package does not accept API permission | Insufficient role or catalog not privileged | Use Global Administrator and confirm the catalog |
+
+---
+
+## 10. How to run
+
+### 10.1 Prepare Ollama
+
+```powershell
+ollama pull gpt-oss:20b
+curl.exe http://localhost:11434/api/tags
+```
+
+### 10.2 Provision the Agent ID
+
+```powershell
+cd provisioning
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+
+.\bootstrap_app.ps1
+.\assign_roles.ps1
+.\.venv\Scripts\python.exe provision_agent.py
+```
+
+Then create the Access Package as described in section 6.4 and fill in
+`provisioning/.env`:
+
+```dotenv
+ACCESS_PACKAGE_ID=<id-do-access-package>
+ASSIGNMENT_POLICY_ID=<id-da-politica-all-agents>
+```
+
+The main variables consumed by the application are:
+
+| Variable | Purpose |
+| --- | --- |
+| `BLUEPRINT_APP_ID` | Agent Identity Blueprint app ID |
+| `BLUEPRINT_SECRET` | Local blueprint secret; development only |
+| `AGENT_APP_ID` | Agent Identity app/client ID used by the sidecar |
+| `AGENT_OBJECT_ID` | Agent Identity object ID used as `targetId` |
+| `ACCESS_PACKAGE_ID` | Access Package identifier |
+| `ASSIGNMENT_POLICY_ID` | Policy with self-service and **All agents** scope |
+| `OLLAMA_MODEL` | Local model, `gpt-oss:20b` in this demo |
+| `ACCESS_DURATION` | ISO 8601 assignment duration, `PT4H` in this demo |
+
+### 10.3 Start the application
+
+```powershell
+cd ..
+.\scripts\sync-env.ps1
+
+# Adjust in the root .env for the local environment:
+# OLLAMA_MODEL=gpt-oss:20b
+# ACCESS_DURATION=PT4H
+
+docker compose up -d --build
+docker compose ps
+```
+
+Open:
+
+- dashboard: [http://localhost:5173](http://localhost:5173);
+- backend: [http://localhost:8000/api/health](http://localhost:8000/api/health);
+- approvals: [https://myaccess.microsoft.com](https://myaccess.microsoft.com).
+
+On the dashboard:
+
+1. enter the task;
+2. select **Start demonstration**;
+3. wait for `pendingApproval`;
+4. approve it in My Access;
+5. follow the delivery and the final `403 -> 200` result.
+
+The **Reset access** button sends an `adminRemove`. Removal is asynchronous; wait for the
+assignment to disappear before starting another run.
+
+---
+
+## 11. Conclusion
+
+The main contribution of this demonstration is not changing an HTTP 403 to 200. It is the
+change in the authorization model.
+
+Instead of receiving a permanent permission before the task is even known, the agent:
+
+1. starts without access;
+2. interprets the objective and compares it with a closed catalog of capabilities;
+3. decides which permission, if any, fulfills the task;
+4. checks whether the capability is already authorized;
+5. when access is absent, provides the rationale for the decision;
+6. submits to the governance policy;
+7. waits for a human decision;
+8. receives access for a defined period.
+
+Microsoft Entra Agent ID provides the agent with its own traceable identity, making it
+possible to attribute its actions to a specific principal and produce audit evidence.
+Microsoft Entra ID Governance adds eligibility, approval, and expiration. The result is a
+double check: the agent evaluates the need in the context of the task, while the policy and
+approver verify whether the grant should occur.
+
+The closed capability catalog, decision validation, safe deny behavior, and access
+expiration act as safeguards. Instead of operating with broad, permanent privileges, the
+agent works within a specific scope associated with the task and limited in time. Together,
+Agent ID and ID Governance extend Zero Trust principles to agent identities: explicit
+identity, least privilege, verification, and temporary access.
+
+This pattern can be applied to creating specialized workloads that assist technical teams
+with administration without eliminating institutional controls or human oversight.
+Possible outcomes include:
+
+- strengthening institutional, identity, and AI governance;
+- making access decisions and requests more transparent and auditable;
+- reducing time spent on repetitive administrative tasks;
+- allowing agents to perform specific activities within predefined boundaries while
+    retaining approval, traceability, and expiration as process controls.
+
+---
+
+## 12. References
+
+Documentation consulted and validated on August 10, 2026:
+
+- [Demonstration source code: Microsoft Entra Agent ID + Identity Governance](https://github.com/Soucheff/Microsoft-Entra-AgentID-IGA)
+- [Plan your agent identity architecture](https://learn.microsoft.com/en-us/entra/agent-id/how-to-plan-agent-identity-architecture)
+- [Governing Agent Identities](https://learn.microsoft.com/en-us/entra/id-governance/agent-id-governance-overview)
+- [Access packages for agent identities in Microsoft Entra](https://learn.microsoft.com/en-us/entra/agent-id/agent-access-packages)
+- [Microsoft Entra ID Governance licensing fundamentals](https://learn.microsoft.com/en-us/entra/id-governance/licensing-fundamentals)
+- [Create accessPackageAssignmentRequest](https://learn.microsoft.com/en-us/graph/api/entitlementmanagement-post-assignmentrequests)
+- [Create assignmentPolicies](https://learn.microsoft.com/en-us/graph/api/entitlementmanagement-post-assignmentpolicies)
+- [Microsoft Entra ID Auth SDK sidecar endpoint reference](https://learn.microsoft.com/en-us/entra/msidweb/agent-id-sdk/endpoints)
+- [View reports and logs in entitlement management](https://learn.microsoft.com/en-us/entra/id-governance/entitlement-management-reports)
+- [Microsoft Entra Agent ID logs](https://learn.microsoft.com/en-us/entra/agent-id/sign-in-audit-logs-agents)
+- [Microsoft Agent 365 plans and pricing](https://www.microsoft.com/microsoft-agent-365#plans-and-pricing)
+- [Ollama: Structured Outputs](https://docs.ollama.com/capabilities/structured-outputs)
+- [Ollama: Thinking](https://docs.ollama.com/capabilities/thinking)
+- [Ollama model library: gpt-oss](https://ollama.com/library/gpt-oss)
+
+:::
