@@ -33,14 +33,7 @@ i18n:
 > Access Package para a própria identidade, apresenta a justificativa da decisão e aguarda
 > a aprovação humana. A chamada que inicialmente retorna **HTTP 403** passa a retornar
 > **HTTP 200** após a entrega temporária da permissão.
->
-> **Estado dos produtos:** o Microsoft Entra Agent ID está em disponibilidade geral desde
-> abril de 2026. A documentação do Microsoft Entra ID Governance, porém, ainda classifica
-> a **governança de identidades de agentes** como preview e lista as **API permissions em
-> Access Packages para Agent IDs ou service principals**, usadas nesta demonstração, como
-> preview. O comportamento descrito foi validado em um tenant real em **9 de agosto de
-> 2026**. Confirme licenciamento, APIs e limitações na documentação oficial antes de usar o
-> padrão em produção.
+
 
 ## Conteúdo
 
@@ -987,14 +980,7 @@ Documentação consultada e validada em 10 de agosto de 2026:
 > does it request an Access Package for its own identity, provide the rationale for the
 > decision, and wait for human approval. The call that initially returns **HTTP 403**
 > returns **HTTP 200** after the temporary permission is delivered.
->
-> **Product status:** Microsoft Entra Agent ID has been generally available since April
-> 2026. However, the Microsoft Entra ID Governance documentation still classifies
-> **identity governance for agents** as preview and lists **API permissions in Access
-> Packages for Agent IDs or service principals**, as used in this demonstration, as
-> preview. The behavior described here was validated in a real tenant on **August 9,
-> 2026**. Confirm licensing, APIs, and limitations in the official documentation before
-> using this pattern in production.
+
 
 ## Contents
 
