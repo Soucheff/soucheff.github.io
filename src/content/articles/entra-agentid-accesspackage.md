@@ -34,8 +34,11 @@ i18n:
 > a aprovação humana. A chamada que inicialmente retorna **HTTP 403** passa a retornar
 > **HTTP 200** após a entrega temporária da permissão.
 >
-> **Estado dos produtos:** a governança de Agent IDs por Access Packages está em
-> **preview**. O comportamento descrito foi validado em um tenant real em **9 de agosto de
+> **Estado dos produtos:** o Microsoft Entra Agent ID está em disponibilidade geral desde
+> abril de 2026. A documentação do Microsoft Entra ID Governance, porém, ainda classifica
+> a **governança de identidades de agentes** como preview e lista as **API permissions em
+> Access Packages para Agent IDs ou service principals**, usadas nesta demonstração, como
+> preview. O comportamento descrito foi validado em um tenant real em **9 de agosto de
 > 2026**. Confirme licenciamento, APIs e limitações na documentação oficial antes de usar o
 > padrão em produção.
 
@@ -392,7 +395,8 @@ allowedTargetScope = allDirectoryAgentIdentities
 ```
 
 Esse valor não aparecia na enumeração pública da referência v1.0 consultada durante o teste.
-Trate-o como comportamento de preview observado, não como contrato estável para automação.
+Trate-o como um valor observado e ainda não documentado nessa enumeração, não como contrato
+estável para automação.
 
 ### 6.5 Configurar o sidecar de autenticação
 
@@ -587,7 +591,7 @@ Pontos críticos:
 - a política precisa permitir self-add e incluir **All agents**;
 - o `schedule` só pode personalizar a duração se a política permitir agenda customizada.
 
-#### Nota sobre permissões em preview
+#### Nota sobre o contrato de autorização do self-request
 
 A referência geral do endpoint lista `EntitlementManagement.ReadWrite.All` como permissão de
 aplicação. Entretanto, na validação deste cenário, o token da Agent Identity não continha
@@ -597,7 +601,8 @@ o pacote, mas não detalha esse contrato de autorização.
 
 Portanto:
 
-- considere o resultado uma **evidência do comportamento de preview validado neste tenant**;
+- considere o resultado uma **evidência empírica validada neste tenant**, não um contrato de
+    autorização documentado;
 - não conceda `EntitlementManagement.ReadWrite.All` ao agente apenas para contornar uma
   configuração incorreta da política;
 - valide o mesmo fluxo no tenant de destino antes de adotá-lo como padrão.
@@ -950,9 +955,12 @@ Entre os resultados possíveis estão:
 Documentação consultada e validada em 10 de agosto de 2026:
 
 - [Código-fonte da demonstração: Microsoft Entra Agent ID + Identity Governance](https://github.com/Soucheff/Microsoft-Entra-AgentID-IGA)
+- [What's new in Microsoft Entra Agent ID](https://learn.microsoft.com/en-us/entra/agent-id/whats-new-agent-id)
 - [Plan your agent identity architecture](https://learn.microsoft.com/en-us/entra/agent-id/how-to-plan-agent-identity-architecture)
+- [What is Microsoft Entra ID Governance?](https://learn.microsoft.com/en-us/entra/id-governance/identity-governance-overview#identity-governance-for-agents-preview)
 - [Governing Agent Identities](https://learn.microsoft.com/en-us/entra/id-governance/agent-id-governance-overview)
 - [Access packages for agent identities in Microsoft Entra](https://learn.microsoft.com/en-us/entra/agent-id/agent-access-packages)
+- [What is entitlement management?](https://learn.microsoft.com/en-us/entra/id-governance/entitlement-management-overview#what-are-access-packages-and-what-resources-can-i-manage-with-them)
 - [Microsoft Entra ID Governance licensing fundamentals](https://learn.microsoft.com/en-us/entra/id-governance/licensing-fundamentals)
 - [Create accessPackageAssignmentRequest](https://learn.microsoft.com/en-us/graph/api/entitlementmanagement-post-assignmentrequests)
 - [Create assignmentPolicies](https://learn.microsoft.com/en-us/graph/api/entitlementmanagement-post-assignmentpolicies)
@@ -980,10 +988,13 @@ Documentação consultada e validada em 10 de agosto de 2026:
 > decision, and wait for human approval. The call that initially returns **HTTP 403**
 > returns **HTTP 200** after the temporary permission is delivered.
 >
-> **Product status:** governance of Agent IDs through Access Packages is in **preview**.
-> The behavior described here was validated in a real tenant on **August 9, 2026**. Confirm
-> licensing, APIs, and limitations in the official documentation before using this pattern
-> in production.
+> **Product status:** Microsoft Entra Agent ID has been generally available since April
+> 2026. However, the Microsoft Entra ID Governance documentation still classifies
+> **identity governance for agents** as preview and lists **API permissions in Access
+> Packages for Agent IDs or service principals**, as used in this demonstration, as
+> preview. The behavior described here was validated in a real tenant on **August 9,
+> 2026**. Confirm licensing, APIs, and limitations in the official documentation before
+> using this pattern in production.
 
 ## Contents
 
@@ -1338,7 +1349,8 @@ allowedTargetScope = allDirectoryAgentIdentities
 ```
 
 This value did not appear in the public enumeration in the v1.0 reference consulted during
-the test. Treat it as observed preview behavior, not as a stable automation contract.
+the test. Treat it as an observed value that is not yet documented in that enumeration,
+not as a stable automation contract.
 
 ### 6.5 Configure the authentication sidecar
 
@@ -1535,7 +1547,7 @@ Critical points:
 - the policy must allow self-add and include **All agents**;
 - the `schedule` can customize the duration only if the policy allows a custom schedule.
 
-#### Note about permissions in preview
+#### Note about the self-request authorization contract
 
 The general endpoint reference lists `EntitlementManagement.ReadWrite.All` as an application
 permission. However, when this scenario was validated, the Agent Identity token did not
@@ -1545,7 +1557,8 @@ request the package but does not detail this authorization contract.
 
 Therefore:
 
-- consider the result **evidence of preview behavior validated in this tenant**;
+- consider the result **empirical evidence validated in this tenant**, not a documented
+    authorization contract;
 - do not grant `EntitlementManagement.ReadWrite.All` to the agent merely to work around an
   incorrect policy configuration;
 - validate the same flow in the target tenant before adopting it as a standard.
@@ -1900,9 +1913,12 @@ Possible outcomes include:
 Documentation consulted and validated on August 10, 2026:
 
 - [Demonstration source code: Microsoft Entra Agent ID + Identity Governance](https://github.com/Soucheff/Microsoft-Entra-AgentID-IGA)
+- [What's new in Microsoft Entra Agent ID](https://learn.microsoft.com/en-us/entra/agent-id/whats-new-agent-id)
 - [Plan your agent identity architecture](https://learn.microsoft.com/en-us/entra/agent-id/how-to-plan-agent-identity-architecture)
+- [What is Microsoft Entra ID Governance?](https://learn.microsoft.com/en-us/entra/id-governance/identity-governance-overview#identity-governance-for-agents-preview)
 - [Governing Agent Identities](https://learn.microsoft.com/en-us/entra/id-governance/agent-id-governance-overview)
 - [Access packages for agent identities in Microsoft Entra](https://learn.microsoft.com/en-us/entra/agent-id/agent-access-packages)
+- [What is entitlement management?](https://learn.microsoft.com/en-us/entra/id-governance/entitlement-management-overview#what-are-access-packages-and-what-resources-can-i-manage-with-them)
 - [Microsoft Entra ID Governance licensing fundamentals](https://learn.microsoft.com/en-us/entra/id-governance/licensing-fundamentals)
 - [Create accessPackageAssignmentRequest](https://learn.microsoft.com/en-us/graph/api/entitlementmanagement-post-assignmentrequests)
 - [Create assignmentPolicies](https://learn.microsoft.com/en-us/graph/api/entitlementmanagement-post-assignmentpolicies)

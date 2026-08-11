@@ -31,3 +31,5 @@ Thumbs.db
 # Playwright cache (rehype-mermaid)
 .cache/
 playwright-report/
+skills-lock.json
+.agents/
