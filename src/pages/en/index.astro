@@ -43,7 +43,7 @@ const demos = (await getDemosForLocale(locale)).slice(0, 3);
     {articles.length === 0 ? (
       <p style="color: var(--color-text-muted);">{t.noContent}</p>
     ) : (
-      <div class="grid gap-4 md:grid-cols-2">
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {articles.map((entry) => (
           <ArticleCard entry={entry} locale={locale} />
         ))}
@@ -59,7 +59,7 @@ const demos = (await getDemosForLocale(locale)).slice(0, 3);
     {demos.length === 0 ? (
       <p style="color: var(--color-text-muted);">{t.noContent}</p>
     ) : (
-      <div class="grid gap-4 md:grid-cols-2">
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {demos.map((entry) => (
           <DemoCard entry={entry} locale={locale} />
         ))}

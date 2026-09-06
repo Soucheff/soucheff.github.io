@@ -150,6 +150,9 @@
     border-radius: var(--radius-lg);
     padding: 1.25rem 1.5rem;
     transition: border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
   }
 
   .card:hover {

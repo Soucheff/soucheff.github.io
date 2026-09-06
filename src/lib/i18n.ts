@@ -13,6 +13,7 @@ export interface UIStrings {
   navDemos: string;
   navTags: string;
   navSearch: string;
+  navMenu: string;
   themeToggle: string;
   languageSwitcher: string;
   readMore: string;
@@ -48,6 +49,7 @@ export const ui: Record<Locale, UIStrings> = {
     navDemos: 'Demos',
     navTags: 'Tags',
     navSearch: 'Buscar',
+    navMenu: 'Menu',
     themeToggle: 'Alternar tema',
     languageSwitcher: 'Idioma',
     readMore: 'Ler mais',
@@ -81,6 +83,7 @@ export const ui: Record<Locale, UIStrings> = {
     navDemos: 'Demos',
     navTags: 'Tags',
     navSearch: 'Search',
+    navMenu: 'Menu',
     themeToggle: 'Toggle theme',
     languageSwitcher: 'Language',
     readMore: 'Read more',

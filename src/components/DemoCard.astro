@@ -33,13 +33,22 @@ const t = ui[locale];
 
   {entry.data.tags.length > 0 && (
     <div class="flex flex-wrap gap-1.5">
-      {entry.data.tags.map((tag) => (
+      {entry.data.tags.slice(0, 4).map((tag) => (
         <TagBadge tag={tag} locale={locale} />
       ))}
+      {entry.data.tags.length > 4 && (
+        <span
+          class="badge"
+          style="opacity: 0.7;"
+          title={entry.data.tags.slice(4).map((tag) => `#${tag}`).join(' ')}
+        >
+          +{entry.data.tags.length - 4}
+        </span>
+      )}
     </div>
   )}
 
-  <div class="mt-3 flex flex-wrap gap-3 text-sm">
+  <div class="mt-auto pt-3 flex flex-wrap gap-3 text-sm">
     <a href={href}>{t.readMore} →</a>
     {entry.data.liveUrl && (
       <a href={entry.data.liveUrl} target="_blank" rel="noopener noreferrer">{t.liveDemo} ↗</a>
