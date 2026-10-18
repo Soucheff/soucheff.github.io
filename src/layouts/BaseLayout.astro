@@ -11,11 +11,12 @@ interface Props {
   description?: string;
   /** Mapa de URLs em outras línguas (para alternate links e LangSwitcher). */
   translations?: Partial<Record<Locale, string>>;
-  /** Quando true, sinaliza ao Pagefind para indexar este body (default true). */
+  /** Artigos e demos entram na busca por padrão; páginas de navegação não. */
   indexable?: boolean;
-  /** Sinaliza tipo de conteúdo para data-pagefind-filter. */
+  /** Distingue publicações das páginas de navegação. */
   pagefindType?: 'article' | 'demo' | 'page';
   ogImage?: string;
+  ogType?: 'website' | 'article';
 }
 
 const {
@@ -23,9 +24,10 @@ const {
   title,
   description,
   translations,
-  indexable = true,
   pagefindType = 'page',
+  indexable = pagefindType !== 'page',
   ogImage,
+  ogType = 'website',
 } = Astro.props;
 
 const t = ui[locale];
@@ -39,13 +41,13 @@ const ogImg = ogImage ?? `${site}/images/brand/soucheff-logo.png`;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title} — {t.siteName}</title>
+    <title>{title === t.siteName ? title : `${title} — ${t.siteName}`}</title>
     <meta name="description" content={description ?? t.tagline} />
     <meta name="author" content="Pedro Soucheff" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="canonical" href={canonical} />
 
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={ogType} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description ?? t.tagline} />
     <meta property="og:url" content={canonical} />
@@ -64,6 +66,7 @@ const ogImg = ogImage ?? `${site}/images/brand/soucheff-logo.png`;
     {translations && <link rel="alternate" hreflang="x-default" href={`${site}${translations.pt ?? '/'}`} />}
 
     <link rel="sitemap" href="/sitemap-index.xml" />
+    <slot name="head" />
 
     <!-- Script anti-flash: aplica o tema ANTES do CSS renderizar. -->
     <script is:inline>
@@ -92,9 +95,11 @@ const ogImg = ogImage ?? `${site}/images/brand/soucheff-logo.png`;
 
     <main
       id="main-content"
-      class="container-wide py-8"
+      class="container-wide site-main"
+      tabindex="-1"
       data-pagefind-body={indexable ? '' : undefined}
-      data-pagefind-filter={indexable ? `lang:${locale},type:${pagefindType}` : undefined}
+      data-content-lang={indexable ? locale : undefined}
+      data-content-type={indexable ? pagefindType : undefined}
     >
       <slot />
     </main>
@@ -102,3 +107,20 @@ const ogImg = ogImage ?? `${site}/images/brand/soucheff-logo.png`;
     <Footer locale={locale} />
   </body>
 </html>
+
+<script>
+  if (
+    window.matchMedia('(prefers-reduced-motion: no-preference) and (pointer: fine)').matches &&
+    'IntersectionObserver' in window
+  ) {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(({ isIntersecting, target }) => {
+        if (!isIntersecting) return;
+        target.classList.add('is-entering');
+        target.addEventListener('animationend', () => target.classList.remove('is-entering'), { once: true });
+        observer.unobserve(target);
+      });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('[data-reveal]').forEach((element) => observer.observe(element));
+  }
+</script>

@@ -1,0 +1,77 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { ui, collectionPath, type Locale } from '@/lib/i18n';
+
+interface Props { locale: Locale; }
+const { locale } = Astro.props;
+const t = ui[locale];
+const translations = locale === 'pt' ? {
+  placeholder: t.searchPlaceholder,
+  clear_search: 'Limpar',
+  load_more: 'Carregar mais',
+  search_label: t.searchTitle,
+  filters_label: 'Filtros',
+  zero_results: 'Sem resultados para [SEARCH_TERM]',
+  many_results: '[COUNT] resultados para [SEARCH_TERM]',
+  one_result: '[COUNT] resultado para [SEARCH_TERM]',
+  searching: 'Buscando [SEARCH_TERM]...',
+} : { placeholder: t.searchPlaceholder };
+---
+
+<BaseLayout locale={locale} title={t.searchTitle} description={t.searchDescription} translations={{ pt: '/buscar', en: '/en/search' }} indexable={false}>
+  <header class="page-heading" data-reveal>
+    <p class="eyebrow">{t.navSearch}</p>
+    <h1 class="display-title">{t.searchTitle}</h1>
+    <p>{t.searchDescription}</p>
+  </header>
+  <div class="search-panel">
+    <p class="search-status" data-search-unavailable hidden role="status">{t.searchUnavailable}</p>
+    <noscript><p class="search-status">{t.searchNoScript}</p></noscript>
+    <div id="search" data-pagefind-ui data-locale={locale} data-translations={JSON.stringify(translations)}></div>
+  </div>
+  <p class="mt-6"><a class="text-link" href={collectionPath('articles', locale)}>← {t.backToArticles}</a></p>
+  <link rel="stylesheet" href="/pagefind/pagefind-ui.css" />
+  <script is:inline src="/pagefind/pagefind-ui.js"></script>
+</BaseLayout>
+
+<script>
+  interface PagefindOptions {
+    element: string;
+    showImages: boolean;
+    showSubResults: boolean;
+    baseUrl: string;
+    translations: Record<string, string>;
+  }
+  declare global {
+    interface Window {
+      PagefindUI?: new (options: PagefindOptions) => {
+        triggerSearch: (term: string) => void;
+      };
+    }
+  }
+
+  const element = document.querySelector<HTMLElement>('#search');
+  const unavailable = document.querySelector<HTMLElement>('[data-search-unavailable]');
+  if (element && unavailable) {
+    if (!window.PagefindUI) {
+      unavailable.hidden = false;
+      console.error('Pagefind UI is unavailable. Build the site before using search.');
+    } else {
+      try {
+        const translations: Record<string, string> = JSON.parse(element.dataset.translations ?? '{}');
+        const search = new window.PagefindUI({
+          element: '#search',
+          showImages: false,
+          showSubResults: true,
+          baseUrl: '/',
+          translations,
+        });
+        const term = new URLSearchParams(window.location.search).get('q');
+        if (term) search.triggerSearch(term);
+      } catch (error) {
+        unavailable.hidden = false;
+        console.error('Could not initialize Pagefind search.', error);
+      }
+    }
+  }
+</script>

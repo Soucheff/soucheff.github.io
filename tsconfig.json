@@ -11,6 +11,6 @@
     "allowJs": true,
     "checkJs": false
   },
-  "include": [".astro/types.d.ts", "src/**/*", "*.ts", "*.mts"],
-  "exclude": ["dist", "node_modules", "scripts/**", "**/*.mjs"]
+  "include": [".astro/types.d.ts", "src/**/*", "scripts/tests/**/*.ts", "*.ts", "*.mts"],
+  "exclude": ["dist", "node_modules", "**/*.mjs"]
 }

@@ -6,9 +6,9 @@
  * em nodes HTML/JSX equivalentes a `<div data-lang="xx">...</div>`.
  *
  * O conteúdo MARKDOWN dentro do container é preservado e renderizado normalmente.
- * Não filtramos por idioma aqui — quem decide qual `<div data-lang>` mantém é o
- * helper `extractLocaleHtml` em src/lib/i18n.ts, aplicado no template da rota,
- * porque o locale alvo varia por página gerada (não é global).
+ * Não filtramos por idioma aqui: prepareArticleHtml escolhe os blocos nos artigos,
+ * enquanto os outros layouts usam o escopo CSS e o pós-processador do Pagefind.
+ * O locale alvo varia por página gerada (não é global).
  *
  * Diretivas suportadas:
  *   :::lang{pt}
@@ -27,6 +27,7 @@ import { visit } from 'unist-util-visit';
 const VALID_LANGS = new Set(['pt', 'en']);
 
 export function remarkI18nDirective() {
+  /** @param {import('mdast').Root} tree */
   return (tree) => {
     visit(tree, (node) => {
       if (

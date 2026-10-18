@@ -45,6 +45,12 @@ jobs:
         env:
           NODE_ENV: production
 
+      - name: Lint
+        run: npm run lint
+
+      - name: Test portal
+        run: npm test
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
@@ -52,6 +58,7 @@ jobs:
 
   deploy:
     name: Deploy to GitHub Pages
+    if: github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     environment:

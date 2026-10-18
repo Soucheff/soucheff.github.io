@@ -22,9 +22,30 @@ Conteúdo em **PT-BR** (padrão) e **EN**.
 | Realce de código | [Shiki](https://shiki.style) (dual-theme light/dark) |
 | Diagramas | [Mermaid](https://mermaid.js.org) via `rehype-mermaid` (SVG inline, zero JS no cliente) |
 | Ilhas interativas | [React](https://react.dev) via `@astrojs/react` |
-| Estilo | [Tailwind v3](https://tailwindcss.com) + tokens CSS (paleta Microsoft) |
+| Estilo | [Tailwind v3](https://tailwindcss.com) + tokens CSS (identidade editorial, claro/escuro) |
 | Busca | [Pagefind](https://pagefind.app) (client-side, pós-build) |
 | Hosting | GitHub Pages via GitHub Actions |
+
+---
+
+## Experiência do portal
+
+- **Perfil e início**: apresentação pessoal, LinkedIn e GitHub, publicação mais recente e
+  navegação por assuntos. A seção e o menu de demos aparecem apenas quando há demos publicadas.
+- **Catálogo**: busca instantânea por título, descrição e tags, combinada com filtro por assunto.
+  Os filtros ficam na URL (`?q=...&tag=...`), podem ser compartilhados e não dependem do Pagefind.
+  Sem JavaScript, o catálogo completo continua disponível.
+- **Leitura**: sumário gerado a partir dos títulos do idioma atual, estimativa de leitura
+  (200 palavras/minuto, incluindo código), tabelas e código com rolagem própria, identificação
+  do autor e sugestões de artigos ao final.
+- **Capas**: o destaque usa o campo `cover` existente ou a primeira imagem local do corpo no
+  idioma da página. As imagens são exibidas completas, sem recortar diagramas.
+- **Idiomas**: início, catálogo e busca compartilham os mesmos componentes em PT/EN.
+  O corpo dos artigos é filtrado no build; títulos repetidos e sumários manuais equivalentes
+  são tratados na apresentação, sem modificar os arquivos de conteúdo.
+
+Links profissionais e iniciais ficam em `src/lib/profile.ts`. Os textos traduzidos ficam em
+`src/lib/i18n.ts`. O perfil não depende de consulta ao LinkedIn ou de outro serviço externo.
 
 ---
 
@@ -160,16 +181,43 @@ sem perda visual perceptível.
 ## Rodando localmente
 
 ```powershell
-# Pré-requisitos: Node 20 LTS (veja .nvmrc) e npm.
+# Pré-requisitos: Node 24 (veja .nvmrc) e npm.
 npm ci
 npm run dev        # http://localhost:4321
 npm run build      # gera dist/ + indexa com Pagefind
 npm run preview    # serve dist/ para testar
+npm run lint       # ESLint para Astro, TypeScript e JavaScript
+npx tsc --noEmit   # verifica também os testes e a configuração do Playwright
+npm test           # testes Playwright contra dist/; execute npm run build antes
 ```
 
 Em primeira instalação, o build executa `playwright install chromium` automaticamente quando
 o `rehype-mermaid` precisa renderizar diagramas. Se preferir pular Mermaid em dev, basta não
 incluir blocos `mermaid` no conteúdo em edição.
+
+### Validação da experiência
+
+```sh
+npm run lint
+npm run check
+npx tsc --noEmit
+npm run build
+npm test
+```
+
+A suíte usa o Chromium já necessário para o Mermaid e inicia/encerra seu próprio preview em
+`127.0.0.1:4431`. Cobre navegação mobile, filtros e URLs compartilháveis, sumário e idioma,
+busca Pagefind real, ausência de JavaScript, preferências de movimento, contraste de texto
+nos dois temas e ausência de transbordamento em 320, 390, 768 e 1440 px.
+Também verifica um orçamento de 30 KiB gzip de JavaScript efetivamente carregado por rota de apresentação
+(o Pagefind é carregado separadamente apenas na busca). A CI executa lint e testes antes do deploy.
+
+No servidor de desenvolvimento, o índice Pagefind não existe: a busca mostra uma mensagem
+explicativa. Para testar a busca completa, use o build de produção com `npm run preview`.
+O índice inclui apenas artigos e demos; páginas de perfil, catálogos e tags não duplicam
+os resultados.
+O idioma dos resultados é selecionado automaticamente pelo Pagefind a partir do `lang`
+da página, sem expor filtros técnicos ao visitante.
 
 ---
 
@@ -188,6 +236,7 @@ soucheff.github.io/
 │   └── optimize-images.mjs         # otimizador PNG/JPEG via sharp (npm run optimize:images)
 ├── src/
 │   ├── components/                 # Header, Footer, ThemeToggle, Cards, demo/*
+│   │   └── pages/                  # HomePage, ArticlesPage e SearchPage compartilhadas PT/EN
 │   ├── content/
 │   │   ├── config.ts               # schemas Zod (articles, demos)
 │   │   ├── articles/<slug>.md      # artigos bilíngues
@@ -196,6 +245,8 @@ soucheff.github.io/
 │   ├── lib/
 │   │   ├── i18n.ts                 # strings de UI + helpers de locale
 │   │   ├── content.ts              # queries de coleções
+│   │   ├── article.ts              # metadados localizados, sumário e apresentação da leitura
+│   │   ├── profile.ts              # identidade e links profissionais
 │   │   └── remark-i18n-directive.mjs # plugin :::lang{}
 │   ├── pages/
 │   │   ├── index.astro             # home PT
@@ -211,6 +262,8 @@ soucheff.github.io/
 ├── astro.config.mjs
 ├── tailwind.config.mjs
 ├── tsconfig.json
+├── eslint.config.mjs
+├── playwright.config.ts
 └── package.json
 ```
 
@@ -223,9 +276,13 @@ Todo push em `main` dispara o workflow [`.github/workflows/deploy.yml`](.github/
 1. Checkout
 2. Setup Node (lê `.nvmrc`) + `npm ci`
 3. `npx playwright install --with-deps chromium` (necessário para Mermaid inline-svg)
-4. `npm run build` (Astro → Astro check → post-process i18n → Pagefind index)
-5. Upload do artifact `dist/`
-6. Job de deploy → `actions/deploy-pages@v4` publica em `https://soucheff.github.io`
+4. `npm run build` (Astro check → Astro build → post-process i18n → Pagefind index)
+5. `npm run lint` e `npm test`
+6. Upload do artifact `dist/`
+7. Job de deploy → `actions/deploy-pages@v5` publica em `https://soucheff.github.io`
+
+Execuções manuais (`workflow_dispatch`) em branches de feature ou release validam o build,
+lint e testes sem publicar. O job de publicação só executa para `refs/heads/main`.
 
 > **Settings → Pages**: a *source* deve estar configurada como **GitHub Actions** (não "Deploy from a branch").
 
@@ -233,19 +290,22 @@ Todo push em `main` dispara o workflow [`.github/workflows/deploy.yml`](.github/
 
 ## Identidade visual
 
-Paleta inspirada no design Microsoft, foco em **segurança corporativa**:
+Identidade editorial com fundo de papel, tipografia serifada nos títulos, corpo sem serifa
+e azul nos pontos de ação. As fontes usam alternativas locais, sem downloads externos.
 
 | Token | Hex | Uso |
 | --- | --- | --- |
-| `--color-bg` (escuro) | `#0F172A` | Fundo principal (Midnight Navy) |
-| `--color-primary` | `#0078D4` | Links, botões, destaque (Azure Blue) |
-| `--color-accent` | `#22C55E` | Badges e indicadores positivos (Security Green) |
-| `--color-surface` | `#1F2937` | Cards e blocos de código |
-| `--color-text` | `#E5E7EB` | Texto principal no tema escuro |
-| `--color-text-muted` | `#6B7280` (claro) / `#9CA3AF` (escuro) | Texto secundário |
+| `--color-bg` | `#F7F7F2` / `#131C22` | Fundo claro / escuro |
+| `--color-primary` | `#254EC3` / `#A7BFFF` | Links e ações |
+| `--color-accent` | `#276449` / `#9BD5B5` | Pequenos destaques |
+| `--color-surface` | `#FFFFFF` / `#1A272E` | Superfícies |
+| `--color-text` | `#202B30` / `#EFF3EE` | Texto principal |
+| `--color-text-muted` | `#58666A` / `#AFBFBE` | Texto secundário |
 
 Modo claro derivado automaticamente; toggle persistente em `localStorage` com fallback em
 `prefers-color-scheme`.
+As animações são discretas, limitadas à entrada de elementos, e desativadas em telas
+de toque ou quando o visitante prefere movimento reduzido.
 
 ---
 

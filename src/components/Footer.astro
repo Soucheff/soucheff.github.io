@@ -1,26 +1,45 @@
 ---
 import type { Locale } from '@/lib/i18n';
-import { ui } from '@/lib/i18n';
+import { ui, collectionPath } from '@/lib/i18n';
+import { profile } from '@/lib/profile';
+import Icon from './Icon.astro';
 
-interface Props {
-  locale: Locale;
-}
-
+interface Props { locale: Locale; }
 const { locale } = Astro.props;
 const t = ui[locale];
 const year = new Date().getFullYear();
 ---
 
-<footer
-  class="mt-16 border-t border-[color:var(--color-border)]"
-  style="background-color: var(--color-surface);"
->
-  <div class="container-wide flex flex-col gap-2 py-6 text-sm sm:flex-row sm:items-center sm:justify-between" style="color: var(--color-text-muted);">
-    <p>&copy; {year} {t.siteName}. {locale === 'pt' ? 'Conteúdo sob CC BY 4.0.' : 'Content licensed under CC BY 4.0.'}</p>
-    <p class="flex items-center gap-3">
-      <a href="https://github.com/soucheff" rel="me noopener" target="_blank">GitHub</a>
-      <span aria-hidden="true">·</span>
-      <a href="https://github.com/soucheff/soucheff.github.io" rel="noopener" target="_blank">{locale === 'pt' ? 'Repositório' : 'Repository'}</a>
-    </p>
+<footer class="site-footer" data-depth="4">
+  <div class="container-wide">
+    <div class="footer-main">
+      <div>
+        <a class="footer-name" href={locale === 'pt' ? '/' : '/en/'}>{t.siteName}<span>.</span></a>
+        <p>{t.tagline}</p>
+      </div>
+      <nav aria-label={locale === 'pt' ? 'Links do rodapé' : 'Footer links'}>
+        <a href={collectionPath('articles', locale)}>{t.navArticles}</a>
+        <a href={profile.linkedIn} target="_blank" rel="me noopener noreferrer">LinkedIn<Icon name="arrow-up-right" size={15} /></a>
+        <a href={profile.github} target="_blank" rel="me noopener noreferrer">GitHub<Icon name="arrow-up-right" size={15} /></a>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; {year} {t.siteName}. {locale === 'pt' ? 'Conteúdo sob CC BY 4.0.' : 'Content licensed under CC BY 4.0.'}</p>
+      <a href="https://github.com/soucheff/soucheff.github.io" target="_blank" rel="noopener noreferrer">
+        {locale === 'pt' ? 'Código deste site' : 'Site source code'}<Icon name="arrow-up-right" size={13} />
+      </a>
+    </div>
   </div>
 </footer>
+
+<style>
+  .site-footer { margin-top: 4rem; border-top: 1px solid var(--color-border); padding-block: 2.5rem 1.5rem; }
+  .footer-main { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1.5rem; padding-bottom: 2rem; }
+  .footer-name { font-size: 1.1rem; font-weight: 700; color: var(--color-text); text-decoration: none; }
+  .footer-name span { color: var(--color-primary); }
+  .footer-main p { margin-top: 0.5rem; color: var(--color-text-muted); font-size: 0.8rem; }
+  .footer-main nav { display: flex; flex-wrap: wrap; gap: 1.25rem; }
+  .footer-main nav a { display: inline-flex; align-items: center; gap: 0.25rem; min-height: 44px; font-size: 0.85rem; color: var(--color-text); }
+  .footer-bottom { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem 1rem; border-top: 1px solid var(--color-border); padding-top: 1.25rem; font-size: 0.7rem; color: var(--color-text-muted); }
+  .footer-bottom a { display: inline-flex; align-items: center; gap: 0.25rem; color: inherit; min-height: 30px; }
+</style>

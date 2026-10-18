@@ -2,7 +2,7 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import ArticleCard from '@/components/ArticleCard.astro';
 import DemoCard from '@/components/DemoCard.astro';
-import { ui, type Locale } from '@/lib/i18n';
+import { ui, getEntryLocales, type Locale } from '@/lib/i18n';
 import { getArticlesForLocale, getDemosForLocale, getTagAggregation } from '@/lib/content';
 
 const locale: Locale = 'pt';
@@ -22,13 +22,19 @@ const [allArticles, allDemos] = await Promise.all([
 ]);
 const articles = allArticles.filter((e) => e.data.tags.includes(safeTag));
 const demos = allDemos.filter((e) => e.data.tags.includes(safeTag));
+const translations: Partial<Record<Locale, string>> = {
+  pt: `/tags/${encodeURIComponent(safeTag)}`,
+};
+if ([...articles, ...demos].some((entry) => getEntryLocales(entry).includes('en'))) {
+  translations.en = `/en/tags/${encodeURIComponent(safeTag)}`;
+}
 ---
 
 <BaseLayout
   locale={locale}
   title={`#${safeTag}`}
   description={`${t.taggedWith} ${safeTag}`}
-  translations={{ pt: `/tags/${encodeURIComponent(safeTag)}`, en: `/en/tags/${encodeURIComponent(safeTag)}` }}
+  translations={translations}
 >
   <p class="mb-1 text-sm" style="color: var(--color-text-muted);">{t.taggedWith}</p>
   <h1 class="mb-8 text-3xl font-bold" style="color: var(--color-text);">#{safeTag}</h1>

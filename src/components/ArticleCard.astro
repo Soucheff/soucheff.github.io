@@ -2,55 +2,78 @@
 import type { CollectionEntry } from 'astro:content';
 import type { Locale } from '@/lib/i18n';
 import { getLocalizedMeta, entryUrl, ui } from '@/lib/i18n';
+import { formatArticleDate, getArticleDetails } from '@/lib/article';
 import TagBadge from './TagBadge.astro';
+import Icon from './Icon.astro';
 
 interface Props {
   entry: CollectionEntry<'articles'>;
   locale: Locale;
+  featured?: boolean;
+  headingLevel?: 'h2' | 'h3';
 }
 
-const { entry, locale } = Astro.props;
+const { entry, locale, featured = false, headingLevel: Heading = 'h3' } = Astro.props;
 const meta = getLocalizedMeta(entry, locale);
 const href = entryUrl('articles', entry.slug, locale);
 const t = ui[locale];
-const formatter = new Intl.DateTimeFormat(locale === 'pt' ? 'pt-BR' : 'en-US', {
-  year: 'numeric',
-  month: 'long',
-  day: 'numeric',
-});
+const details = getArticleDetails(entry.body, locale);
+const image = entry.data.cover
+  ? { src: entry.data.cover.src, alt: meta.title }
+  : details.image;
 ---
 
-<article class="card">
-  <header class="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-    <h3 class="m-0 text-lg font-bold">
-      <a href={href} class="no-underline" style="color: var(--color-text);">{meta.title}</a>
-    </h3>
-    <time
-      datetime={entry.data.pubDate.toISOString()}
-      class="text-xs"
-      style="color: var(--color-text-muted);"
-    >
-      {formatter.format(entry.data.pubDate)}
-    </time>
-  </header>
-  <p class="mb-3 text-sm" style="color: var(--color-text-muted);">{meta.description}</p>
-  {entry.data.tags.length > 0 && (
-    <div class="flex flex-wrap gap-1.5">
-      {entry.data.tags.slice(0, 4).map((tag) => (
-        <TagBadge tag={tag} locale={locale} />
-      ))}
-      {entry.data.tags.length > 4 && (
-        <span
-          class="badge"
-          style="opacity: 0.7;"
-          title={entry.data.tags.slice(4).map((tag) => `#${tag}`).join(' ')}
-        >
-          +{entry.data.tags.length - 4}
-        </span>
-      )}
+<article class:list={['article-card', featured && 'article-card--featured', featured && image && 'article-card--with-image']} data-depth="4">
+  <div class="article-card-content">
+    {featured && <p class="eyebrow featured-label">{t.featuredArticle}</p>}
+    <div class="article-card-meta">
+      <time datetime={entry.data.pubDate.toISOString()}>{formatArticleDate(entry.data.pubDate, locale)}</time>
+      <span aria-hidden="true">·</span>
+      <span>{details.readingMinutes} {t.readingMinutes}</span>
     </div>
+    <Heading class="article-card-title"><a href={href}>{meta.title}</a></Heading>
+    <p class="article-card-description">{meta.description}</p>
+    <div class="article-card-bottom">
+      {entry.data.tags.length > 0 && (
+        <div class="article-card-tags">
+          {entry.data.tags.slice(0, 2).map((tag) => <TagBadge tag={tag} locale={locale} />)}
+          {entry.data.tags.length > 2 && (
+            <span class="extra-tags" title={entry.data.tags.slice(2).join(', ')}>+{entry.data.tags.length - 2}</span>
+          )}
+        </div>
+      )}
+      <a href={href} class="text-link" aria-label={`${t.readMore}: ${meta.title}`}>
+        {t.readMore}<Icon name="arrow-right" size={17} />
+      </a>
+    </div>
+  </div>
+  {featured && image && (
+    <a href={href} class="article-card-image depth-3" data-depth="3" tabindex="-1" aria-hidden="true">
+      <img src={image.src} alt="" width="960" height="540" loading="lazy" decoding="async" />
+    </a>
   )}
-  <p class="mt-auto pt-3 text-sm">
-    <a href={href}>{t.readMore} →</a>
-  </p>
 </article>
+
+<style>
+  .article-card { min-width: 0; height: 100%; padding: 1.6rem 0; border-top: 1px solid var(--color-border); }
+  .article-card-content { display: flex; flex-direction: column; min-width: 0; height: 100%; }
+  .article-card-meta { display: flex; flex-wrap: wrap; gap: 0.45rem; color: var(--color-text-muted); font-size: 0.72rem; line-height: 1.5; }
+  .article-card-title { margin-block: 0.85rem; font-size: 1.3rem; font-weight: 650; letter-spacing: -0.025em; line-height: 1.4; text-wrap: pretty; overflow-wrap: anywhere; }
+  .article-card-title a { color: var(--color-text); text-decoration: none; }
+  .article-card-title a:hover { color: var(--color-primary); }
+  .article-card-description { color: var(--color-text-muted); font-size: 0.9rem; line-height: 1.8; }
+  .article-card-bottom { margin-top: auto; padding-top: 1.2rem; }
+  .article-card-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-bottom: 0.5rem; }
+  .extra-tags { color: var(--color-text-muted); font-size: 0.7rem; padding-inline: 0.3rem; }
+  .article-card--featured { padding: clamp(1.25rem, 3vw, 2rem); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
+  .article-card--with-image { display: grid; grid-template-columns: 1.1fr 1fr; align-items: center; gap: 2rem; }
+  .featured-label { color: var(--color-primary); margin-bottom: 1.2rem; }
+  .article-card--featured .article-card-title { font-family: var(--font-display); font-size: clamp(1.5rem, 2.5vw, 2rem); font-weight: 600; line-height: 1.25; }
+  .article-card-image { display: flex; align-items: center; overflow: hidden; aspect-ratio: 16 / 10; border-radius: var(--radius); background: var(--color-feature-bg); }
+  .article-card-image img { display: block; width: 100%; height: 100%; object-fit: contain; }
+  @media (max-width: 767px) {
+    .article-card--with-image { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+    .article-card-image { order: -1; aspect-ratio: 16 / 9; }
+    .article-card-title { font-size: 1.2rem; }
+  }
+</style>
