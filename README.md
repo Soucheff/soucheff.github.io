@@ -281,8 +281,12 @@ Todo push em `main` dispara o workflow [`.github/workflows/deploy.yml`](.github/
 6. Upload do artifact `dist/`
 7. Job de deploy → `actions/deploy-pages@v5` publica em `https://soucheff.github.io`
 
-Execuções manuais (`workflow_dispatch`) em branches de feature ou release validam o build,
-lint e testes sem publicar. O job de publicação só executa para `refs/heads/main`.
+Pull requests para `main` e `develop` validam o build, lint e testes antes do merge.
+Execuções manuais (`workflow_dispatch`) em branches de feature ou release também validam
+sem publicar. Apenas `refs/heads/main` gera o artefato de Pages e executa o job de
+publicação; as permissões de Pages e OIDC ficam restritas a esse job.
+As execuções são serializadas por ref, para que a validação de um PR não substitua
+uma publicação pendente na fila de produção.
 
 > **Settings → Pages**: a *source* deve estar configurada como **GitHub Actions** (não "Deploy from a branch").
 

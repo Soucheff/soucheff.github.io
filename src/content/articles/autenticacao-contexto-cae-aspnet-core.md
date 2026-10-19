@@ -1,5 +1,6 @@
 ---
 pubDate: 2026-01-05
+updatedDate: 2026-10-18
 author: Pedro Soucheff
 tags:
   - entra-id
@@ -11,12 +12,14 @@ tags:
 i18n:
   pt:
     title: "Autenticação Baseada em Contexto e CAE (Continuous Access Evaluation) em Aplicações ASP.NET Core"
-    description: "Implementação de Authentication Context, claims challenge e CAE em uma aplicação ASP.NET Core com Microsoft Entra ID, usando diferentes níveis de risco na API TodoList."
+    description: "Authentication Context e claims challenge em ASP.NET Core com Microsoft Entra ID: autorização por risco, retomada do login e limites do CAE no exemplo TodoList."
 ---
 
 :::lang{pt}
 
-> Publicado originalmente no [Medium](https://medium.com/@pedro.soucheff/autentica%C3%A7%C3%A3o-baseada-em-contexto-e-cae-continuous-access-evaluation-em-aplica%C3%A7%C3%B5es-asp-net-core-7049015ea466) em 5 de janeiro de 2026. O conteúdo e os exemplos desta republicação foram preservados da publicação original.
+> Publicado originalmente no [Medium](https://medium.com/@pedro.soucheff/autentica%C3%A7%C3%A3o-baseada-em-contexto-e-cae-continuous-access-evaluation-em-aplica%C3%A7%C3%B5es-asp-net-core-7049015ea466) em 5 de janeiro de 2026.
+>
+> **Revisão técnica da republicação — 18 de outubro de 2026:** os exemplos foram corrigidos para encerrar a resposta ao iniciar um desafio interativo, exigir um novo envio das alterações após o login e preservar as verificações de existência e proprietário no exemplo de auditoria. Os exemplos também mantêm PII desabilitada nos logs por padrão. Foi delimitada a diferença entre Authentication Context, suporte a claims challenge e revogação por eventos de CAE. A publicação original permanece disponível no link acima.
 
 ![Autenticação baseada em contexto e CAE em aplicações ASP.NET Core](/images/articles/autenticacao-contexto-cae-aspnet-core/banner.png)
 
@@ -27,12 +30,12 @@ A segurança moderna não pode mais depender apenas de logins e senhas. Em um ce
 Ao adotar esses mecanismos, sua aplicação ganha benefícios imediatos e tangíveis:
 
 - **Segurança granular**, permitindo exigir níveis diferentes de autenticação conforme o risco da operação.
-- **Proteção contínua**, com tokens que podem ser invalidados instantaneamente diante de eventos críticos.
+- **Proteção contínua em recursos compatíveis com CAE**, que podem deixar de aceitar tokens após eventos críticos, conforme suporte e latência de propagação do serviço.
 - **Experiência de usuário equilibrada**, evitando desafios desnecessários e mantendo fluidez no uso diário.
 - **Compliance facilitado**, atendendo requisitos regulatórios com controles precisos e auditáveis.
 - **Eficiência operacional**, graças ao uso de tokens de longa duração sem comprometer a segurança.
 
-Neste artigo, você vai descobrir como implementar esses recursos em aplicações ASP.NET Core usando Microsoft Entra ID, explorando na prática como elevar o nível de segurança da sua API e, ao mesmo tempo, oferecer uma experiência moderna e inteligente aos usuários.
+Neste artigo, a aplicação ASP.NET Core demonstra Authentication Context e tratamento de claims challenge com Microsoft Entra ID. CAE fornece o contexto conceitual, mas a API TodoList mostrada não implementa recepção ou imposição de eventos de revogação.
 
 ## O que é Autenticação Baseada em Contexto
 
@@ -65,10 +68,18 @@ A **Autenticação Baseada em Contexto** (Authentication Context) é um recurso 
 
 ### Como Funciona:
 
-- **Cliente CAE-capable**: O cliente deve anunciar sua capacidade de lidar com CAE através do claim `xms_cc` com valor `cp1`
-- **Tokens de longa duração**: Tokens podem ter até 28 horas de validade (vs. 1 hora tradicional)
-- **Revogação instantânea**: Quando um evento crítico ocorre, o token é invalidado imediatamente
+- **Cliente compatível com claims challenge**: O cliente anuncia a capacidade `cp1`; o token emitido para a API pode refletir essa capacidade no claim `xms_cc`
+- **Tokens de longa duração**: Sessões compatíveis com CAE podem receber tokens com validade de até 28 horas; isso não é uma garantia desta API customizada
+- **Avaliação de eventos no recurso**: O serviço precisa receber e aplicar os eventos pertinentes. A documentação indica resposta próxima do tempo real, com possível latência de propagação
 - **Claims Challenge**: A API retorna um desafio (WWW-Authenticate header) solicitando novo token
+
+### Limites da demonstração
+
+`xms_cc=cp1` anuncia suporte do cliente a claims challenge; ele não implementa revogação no servidor. Da mesma forma, validar `acrs` atende a um contexto de autenticação, mas não substitui autorização sobre o item solicitado.
+
+O teste de `iat` abaixo é uma política local de idade do token. Ele não consulta a revogação de sessões, o estado da conta nem eventos do Entra. Um token recente ainda pode ser aceito pelo exemplo após um desses eventos. Solicitar outro token também não garante uma nova interação ou MFA: isso depende das políticas do provedor de identidade.
+
+Os benefícios de CAE por eventos exigem suporte efetivo do recurso e do cliente. Consulte os [cenários e limitações oficiais de CAE](https://learn.microsoft.com/entra/identity/conditional-access/concept-continuous-access-evaluation) antes de assumir essas garantias em uma API própria.
 
 ## Arquitetura da Solução TodoList
 
@@ -225,12 +236,7 @@ public async Task<ActionResult> Details(int id)
         
         // ⭐ Desafiar o usuário com escopos e claims necessários
         _consentHandler.ChallengeUser(ex.Scopes, claimsChallenge);
-        
-        // Tentar novamente após o desafio
-        TodoListItem item = await _downstreamApi.GetForUserAsync<TodoListItem>(
-            "TodoList",
-            options => options.RelativePath = $"api/todolist/{id}");
-        return View(item);
+        return new EmptyResult();
     }
 }
 ```
@@ -245,7 +251,7 @@ public async Task<ActionResult> Details(int id)
 6. Usa `_consentHandler.ChallengeUser()` para redirecionar o usuário ao Entra ID
 7. Usuário completa a autenticação adicional (ex: MFA)
 8. Novo token é emitido com o claim `acrs` necessário
-9. Cliente retenta a operação com o novo token
+9. A resposta que iniciou o desafio é encerrada; a leitura só é retomada em uma nova requisição após a autenticação
 
 #### Operação de Atualização com Claims Challenge
 
@@ -275,19 +281,24 @@ public async Task<ActionResult> Update(int id, [Bind("Id,Title,Owner,RiskLevel")
             claimsChallenge = msalException.Claims;
         }
 
-        // ⭐ Desafiar usuário e tentar novamente
-        _consentHandler.ChallengeUser(ex.Scopes, claimsChallenge);
-        await _downstreamApi.CallApiForUserAsync<TodoListItem, TodoListItem>(
-            "TodoList", item,
-            options => 
-            { 
-                options.RelativePath = $"api/todolist/{id}"; 
-                options.HttpMethod = HttpMethod.Patch.ToString(); 
-            });
-        return RedirectToAction("Index");
+        // Retornar a uma tela GET, sem repetir a mutação durante o desafio.
+        var returnUri = Url.Action("Edit", "TodoList", new { id })
+            ?? throw new InvalidOperationException("A rota GET TodoList/Edit deve estar configurada.");
+
+        return RedirectToAction("Challenge", "Account", new
+        {
+            area = "MicrosoftIdentity",
+            redirectUri = returnUri,
+            scope = ex.Scopes is null ? null : string.Join(" ", ex.Scopes),
+            claims = claimsChallenge
+        });
     }
 }
 ```
+
+**Reenvio da alteração:** este fluxo pressupõe uma ação **GET `TodoList/Edit`** para reabrir o formulário depois do login. Os valores enviados no POST não são persistidos por este trecho: o usuário deve reinformar ou confirmar as alterações e fazer um novo envio com antiforgery. Se o produto precisar preservar um rascunho, armazene-o no servidor, vinculado ao usuário e com expiração, e valide novamente a autorização antes de aplicá-lo. Não transporte os dados do formulário na URL nem reproduza automaticamente uma mutação.
+
+`MicrosoftIdentity/Account/Challenge` é disponibilizado por `AddMicrosoftIdentityUI()`; seus parâmetros `redirectUri`, `scope` e `claims` estão documentados em [AccountController.Challenge](https://learn.microsoft.com/dotnet/api/microsoft.identity.web.ui.areas.microsoftidentity.controllers.accountcontroller.challenge). O `redirectUri` acima é gerado pela aplicação, não recebido diretamente do usuário.
 
 ## Implementação na API (TodoList.API)
 
@@ -301,8 +312,8 @@ void ConfigureServices(IServiceCollection services, IConfiguration configuration
     services.AddControllers();
     services.AddOpenApi();
     
-    // Habilita exibição de PII para debugging (apenas desenvolvimento!)
-    IdentityModelEventSource.ShowPII = true;
+    // Não expor PII nos logs por padrão.
+    IdentityModelEventSource.ShowPII = false;
     
     // ⭐ Desabilita mapeamento de claims para preservar claims originais do token
     JwtSecurityTokenHandler.DefaultMapInboundClaims = false;
@@ -319,7 +330,7 @@ void ConfigureServices(IServiceCollection services, IConfiguration configuration
 ```csharp
 public bool IsClientCapableofClaimsChallenge(ClaimsPrincipal context)
 {
-    // ⭐ Verifica se o cliente suporta CAE através do claim xms_cc
+    // ⭐ Verifica se o cliente anuncia suporte a claims challenge.
     Claim? ccClaim = context.Claims.FirstOrDefault(
         x => x.Type == AuthenticationContext.clientCapabilitiesClaim);
     
@@ -333,9 +344,9 @@ public bool IsClientCapableofClaimsChallenge(ClaimsPrincipal context)
 
 **Explicação:**
 
-- O claim `xms_cc` (client capabilities) com valor `cp1` indica que o cliente suporta CAE
-- Clientes modernos do Microsoft Identity automaticamente incluem este claim
-- Se o cliente não suportar CAE, a API pode rejeitar operações sensíveis
+- O claim `xms_cc` (client capabilities) com valor `cp1` indica suporte do cliente a claims challenge, não imposição de eventos de CAE pela API
+- Configure `ClientCapabilities` com `cp1` no cliente e o claim opcional `xms_cc` no recurso, conforme a [documentação de client capabilities](https://learn.microsoft.com/entra/identity-platform/claims-challenge#client-capabilities); não presuma que todo token incluirá esse claim
+- Nesta demonstração, a API exige essa capacidade para as operações protegidas por contexto
 
 #### Método Central: CheckForRequiredAuthContext
 
@@ -349,7 +360,7 @@ public IActionResult? CheckForRequiredAuthContext(ClaimsPrincipal claimsPrincipa
         x => x.Type == AuthenticationContext.authenticationContextClassReferencesClaim 
         && x.Value == RiskLevel);
     
-    // 2️⃣ Verificar se o cliente suporta CAE
+    // 2️⃣ Verificar se o cliente anuncia suporte a claims challenge.
     if (!IsClientCapableofClaimsChallenge(claimsPrincipal))
     {
         throw new UnauthorizedAccessException(
@@ -451,7 +462,7 @@ public IActionResult? CheckForRequiredAuthContext(ClaimsPrincipal claimsPrincipa
 **Fluxo de Validação:**
 
 1. **Verificação de ACRS**: Checa se o token já contém o claim `acrs` com o valor de risco necessário
-2. **Verificação de Capacidade CAE**: Garante que o cliente suporta claims challenge (`xms_cc=cp1`)
+2. **Verificação de Capacidade do Cliente**: Confere o anúncio de suporte a claims challenge (`xms_cc=cp1`), sem atestar revogação por eventos
 3. **Verificação de Freshness**: Verifica se o token foi emitido há menos de 15 minutos
 4. **Autorização ou Challenge**: Se tudo OK, autoriza; caso contrário, retorna claims challenge
 
@@ -750,8 +761,8 @@ catch (MicrosoftIdentityWebChallengeUserException ex)
         claimsChallenge      // Claims adicionais necessários
     );
     
-    // 4️⃣ Após o usuário completar o desafio, tentar novamente
-    var result = await _downstreamApi.GetForUserAsync<TodoListItem>(...);
+    // 4️⃣ Encerrar a resposta. A leitura será retomada em outra requisição.
+    return new EmptyResult();
 }
 ```
 
@@ -765,7 +776,9 @@ O método `ChallengeUser()` do `MicrosoftIdentityConsentAndConditionalAccessHand
 4. Entra ID avalia as políticas de acesso condicional correspondentes ao ACR solicitado
 5. Usuário completa os requisitos (ex: MFA, dispositivo gerenciado)
 6. Novo token é emitido com o claim `acrs` incluído
-7. Cliente retorna automaticamente ao fluxo original com o novo token
+7. Uma nova requisição pode usar o token adquirido; a requisição que iniciou o desafio não continua aguardando o login
+
+Para leituras, encerre a resposta com `EmptyResult` depois de chamar o handler, como no [exemplo oficial de Authentication Context](https://learn.microsoft.com/entra/identity-platform/developer-guide-conditional-access-authentication-context#integration-steps). Para alterações, use uma URL de retorno GET e um novo envio explícito, como no exemplo de atualização.
 
 ## Melhores Práticas
 
@@ -773,7 +786,7 @@ O método `ChallengeUser()` do `MicrosoftIdentityConsentAndConditionalAccessHand
 
 ✅ **FAZER:**
 
-- Sempre verificar `xms_cc=cp1` antes de confiar em CAE
+- Verificar `xms_cc=cp1` quando o contrato da API exigir suporte a claims challenge, sem tratá-lo como prova de revogação por eventos
 - Implementar verificação do token para operações sensíveis, como freshness, mudança de localidade
 - Usar diferentes níveis de ACR para diferentes níveis de sensibilidade de dados
 - Configurar políticas de acesso condicional alinhadas aos níveis de ACR
@@ -790,7 +803,7 @@ O método `ChallengeUser()` do `MicrosoftIdentityConsentAndConditionalAccessHand
 
 ✅ **FAZER:**
 
-- Implementar retry automático após claims challenge
+- Retomar leituras em uma nova requisição após a autenticação e solicitar confirmação para reenviar alterações
 - Fornecer mensagens de erro claras quando a autenticação falha
 - Usar níveis de risco apropriados (não exigir MFA para tudo)
 - Considerar cache de tokens com CAE para reduzir prompts
@@ -823,6 +836,7 @@ catch (MicrosoftIdentityWebChallengeUserException ex)
     }
     
     _consentHandler.ChallengeUser(ex.Scopes, claimsChallenge);
+    return new EmptyResult();
 }
 catch (HttpRequestException httpEx)
 {
@@ -842,7 +856,7 @@ catch (Exception ex)
 
 - Usar cache de tokens em memória (`AddInMemoryTokenCaches()`)
 - Considerar cache distribuído para aplicações web em escala
-- Implementar tokens de longa duração com CAE (até 28 horas)
+- Usar tokens de longa duração somente nos cenários compatíveis com CAE; não assumir revogação por eventos nesta API customizada
 - Reutilizar tokens válidos sempre que possível
 
 ### 5. Compliance e Auditoria
@@ -854,12 +868,23 @@ catch (Exception ex)
 - Monitorar falhas de autenticação e padrões anômalos
 - Documentar mapeamento entre níveis de ACR e requisitos de compliance
 
+O exemplo abaixo substitui o GET anterior, mantendo os escopos e a autorização por proprietário antes de registrar ou retornar dados do item.
+
 ```csharp
+[HttpGet("{id}", Name = "Get")]
+[RequiredScope(AcceptedScope = new string[]
+    { Scopes.ToDoListRead, Scopes.ToDoListReadWrite })]
 public IActionResult Get(int id)
 {
-    TodoListItem item = TodoStore[id];
+    if (!TodoStore.TryGetValue(id, out var item) || item.Owner != _currentPrincipalId)
+    {
+        _logger.LogWarning(
+            "TodoItem {ItemId} unavailable for User {UserId}",
+            id, _currentPrincipalId);
+        return NotFound();
+    }
     
-    // Auditoria antes da verificação
+    // Proprietário já verificado; auditar antes de conferir o contexto.
     _logger.LogInformation(
         "User {UserId} attempting to access TodoItem {ItemId} with RiskLevel {RiskLevel}",
         _currentPrincipalId, id, item.RiskLevel);
@@ -886,15 +911,15 @@ public IActionResult Get(int id)
 
 ## Conclusão
 
-A **Autenticação Baseada em Contexto** e **CAE (Continuous Access Evaluation)** representam uma evolução significativa na segurança de aplicações modernas, permitindo:
+A demonstração implementa **Authentication Context**, claims challenge e uma política local de idade do token. Esses mecanismos podem participar de uma arquitetura com **CAE**, mas o exemplo não recebe nem aplica eventos de revogação de conta ou sessão.
 
-### Benefícios Alcançados:
+### Benefícios e limites:
 
 1. **Segurança Adaptativa**: Diferentes operações exigem diferentes níveis de garantia de autenticação
-2. **Proteção em Tempo Real**: Tokens podem ser revogados instantaneamente quando eventos críticos ocorrem
-3. **Experiência Otimizada**: Usuários não são desafiados desnecessariamente para operações de baixo risco
+2. **Revogação por eventos**: É um benefício de recursos efetivamente compatíveis com CAE, não entregue pela checagem de `iat`, `acrs` e `cp1` desta amostra
+3. **Retomada da operação**: Leituras podem ser refeitas após o login; alterações exigem novo envio e nova autorização
 4. **Compliance Facilitado**: Atende requisitos regulatórios com controles granulares
-5. **Tokens de Longa Duração**: Reduz necessidade de reautenticação frequente mantendo segurança
+5. **Tokens de Longa Duração**: Dependem do suporte do cliente e do recurso; não substituem as verificações de autorização da API
 
 ### Componentes-Chave da Implementação:
 
@@ -903,11 +928,11 @@ A **Autenticação Baseada em Contexto** e **CAE (Continuous Access Evaluation)*
 - `MicrosoftIdentityConsentAndConditionalAccessHandler` para gerenciar desafios
 - Tratamento robusto de `MicrosoftIdentityWebChallengeUserException`
 - Extração de claims challenge de `MsalUiRequiredException`
-- Retry automático após autenticação bem-sucedida
+- Retomada de leituras em nova requisição e reenvio explícito das alterações
 
 **Na API (TodoList.API):**
 
-- Verificação de `xms_cc=cp1` para garantir capacidade CAE
+- Verificação de `xms_cc=cp1` para conferir suporte a claims challenge
 - Validação de claim `acrs` baseado no nível de risco da operação
 - Verificação de freshness do token, podendo ser por tempo ou outros elementos.
 - Construção correta de header `WWW-Authenticate` com claims challenge
@@ -938,7 +963,7 @@ A **Autenticação Baseada em Contexto** e **CAE (Continuous Access Evaluation)*
 - [Microsoft Identity Web Library](https://github.com/AzureAD/microsoft-identity-web)
 
 **Autor:** Pedro Soucheff
-**Última atualização:** Dezembro 2025
-**Versão:** 1.1
+**Metadados do texto original no Medium:** última atualização em dezembro de 2025, versão 1.1.
+**Revisão técnica desta republicação:** 18 de outubro de 2026, com as correções descritas no início do artigo.
 
 :::

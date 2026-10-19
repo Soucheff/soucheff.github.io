@@ -1,14 +1,19 @@
 import { test, expect } from 'playwright/test';
 import { gzipSync } from 'node:zlib';
+import { readFile } from 'node:fs/promises';
+import { unified } from 'unified';
+import remarkParse from 'remark-parse';
+import { visit } from 'unist-util-visit';
 import { getArticleDetails, prepareArticleHtml, formatArticleDate } from '../../src/lib/article';
 
 const mediumArticlePath = '/artigos/autenticacao-contexto-cae-aspnet-core';
 const mediumArticleTitle = 'Autenticação Baseada em Contexto e CAE (Continuous Access Evaluation) em Aplicações ASP.NET Core';
 
-test('Medium republication preserves its date, source, code, and local images without overflowing', async ({ page }) => {
+test('Medium republication keeps its original date and source, with reviewed examples and local images', async ({ page }) => {
   await page.goto(mediumArticlePath);
   await expect(page.locator('main h1')).toHaveText(mediumArticleTitle);
   await expect(page.locator('.article-byline time')).toHaveAttribute('datetime', '2026-01-05T00:00:00.000Z');
+  await expect(page.locator('.article-updated time')).toHaveAttribute('datetime', '2026-10-18T00:00:00.000Z');
   await expect(page.locator('.article-body a').filter({ hasText: /^Medium$/ })).toHaveAttribute('href', /7049015ea466$/);
   await expect(page.locator('.article-body pre')).toHaveCount(20);
   const images = page.locator('.article-body img');
@@ -21,11 +26,38 @@ test('Medium republication preserves its date, source, code, and local images wi
     elements.every((element) => element instanceof HTMLImageElement && element.complete && element.naturalWidth > 0),
   )).toBe(true);
   await expect(page.locator('.article-body')).toContainText('MicrosoftIdentityConsentAndConditionalAccessHandler');
-  await expect(page.locator('.article-body')).toContainText('Versão: 1.1');
+  await expect(page.locator('.article-body')).toContainText('Revisão técnica da republicação');
+  await expect(page.locator('.article-body')).toContainText('o exemplo não recebe nem aplica eventos de revogação');
   for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
   }
+});
+
+test('published C# excerpts retain the reviewed challenge and authorization safeguards', async () => {
+  const markdown = await readFile(new URL('../../src/content/articles/autenticacao-contexto-cae-aspnet-core.md', import.meta.url), 'utf8');
+  const snippets: string[] = [];
+  visit(unified().use(remarkParse).parse(markdown), 'code', (node) => {
+    if (node.lang === 'csharp') snippets.push(node.value);
+  });
+  const details = snippets.find((code) => code.includes('Task<ActionResult> Details('));
+  const update = snippets.find((code) => code.includes('Task<ActionResult> Update('));
+  const audit = snippets.find((code) => code.includes('IActionResult Get(') && code.includes('_logger.LogInformation'));
+  if (!details || !update || !audit) throw new Error('Reviewed controller excerpts are missing');
+  expect(details.match(/_downstreamApi\./g)).toHaveLength(1);
+  expect(update.match(/_downstreamApi\./g)).toHaveLength(1);
+  for (const code of snippets.filter((snippet) => snippet.includes('_consentHandler.ChallengeUser('))) {
+    const afterChallenge = code.slice(code.indexOf('_consentHandler.ChallengeUser('));
+    expect(afterChallenge).not.toContain('_downstreamApi.');
+    expect(afterChallenge).toContain('return new EmptyResult();');
+  }
+  expect(update).toContain('Url.Action("Edit", "TodoList", new { id })');
+  expect(update).toContain('RedirectToAction("Challenge", "Account"');
+  expect(audit).toContain('item.Owner != _currentPrincipalId');
+  expect(audit).toContain('return NotFound();');
+  expect(audit).toContain('[RequiredScope(');
+  expect(audit.indexOf('TodoStore.TryGetValue')).toBeLessThan(audit.indexOf('_logger.LogInformation'));
+  expect(audit.indexOf('CheckForRequiredAuthContext')).toBeLessThan(audit.indexOf('return Ok(item)'));
 });
 
 test('Portuguese-only publications and topics do not offer nonexistent English translations', async ({ page }) => {
@@ -203,6 +235,34 @@ test('themes persist, both palettes meet normal-text contrast, and keyboard user
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+});
+
+test('focused skip links meet normal-text contrast in both themes', async ({ page }) => {
+  for (const theme of ['light', 'dark']) {
+    await page.goto('/');
+    await page.evaluate((value) => document.documentElement.setAttribute('data-theme', value), theme);
+    const link = page.getByRole('link', { name: 'Pular para o conteúdo', exact: true });
+    await link.focus();
+    await expect(link).toBeVisible();
+    const ratio = await link.evaluate((element) => {
+      const style = getComputedStyle(element);
+      const luminance = (color: string): number => {
+        const channels = color.match(/[\d.]+/g)?.slice(0, 3).map(Number);
+        if (!channels || channels.length !== 3 || !channels.every(Number.isFinite)) {
+          throw new Error(`Unexpected computed color: ${color}`);
+        }
+        const linear = channels.map((value) => {
+          const channel = value / 255;
+          return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+        });
+        return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+      };
+      const foreground = luminance(style.color);
+      const background = luminance(style.backgroundColor);
+      return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+    });
+    expect(ratio, `${theme} focused skip link`).toBeGreaterThanOrEqual(4.5);
+  }
 });
 
 test('content and native navigation remain available without JavaScript', async ({ browser }) => {
