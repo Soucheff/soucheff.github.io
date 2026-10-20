@@ -1,0 +1,31 @@
+---
+const paths = {
+  'arrow-right': 'M5 12h14m-6-6 6 6-6 6',
+  'arrow-up-right': 'M7 17 17 7M7 7h10v10',
+  search: 'm21 21-4.4-4.4M19 10.5a8.5 8.5 0 1 1-17 0 8.5 8.5 0 0 1 17 0',
+  menu: 'M4 6h16M4 12h16M4 18h16',
+  clock: 'M12 8v4l3 2M22 12A10 10 0 1 1 2 12a10 10 0 0 1 20 0',
+  chevron: 'm6 9 6 6 6-6',
+};
+
+interface Props {
+  name: keyof typeof paths;
+  size?: number;
+}
+
+const { name, size = 18 } = Astro.props;
+---
+
+<svg
+  width={size}
+  height={size}
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="1.7"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+  aria-hidden="true"
+>
+  <path d={paths[name]} />
+</svg>

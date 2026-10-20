@@ -3,11 +3,13 @@
 /**
  * Pós-processador para o i18n single-source.
  *
- * Cada página renderiza AMBOS os idiomas (PT e EN), e o CSS esconde o que
+ * Layouts como o de demos renderizam AMBOS os idiomas (PT e EN), e o CSS esconde o que
  * não corresponde ao locale da página via `[data-locale-current]`. Pagefind,
  * entretanto, lê apenas o HTML estático (não executa CSS), portanto adicionamos
  * `data-pagefind-ignore="all"` aos blocos do idioma "errado" para que não
  * apareçam no índice de busca.
+ * Artigos já removem o idioma alternativo em prepareArticleHtml; este passo
+ * continua como proteção para os demais layouts.
  *
  * Roda DEPOIS de `astro build` e ANTES de `pagefind --site dist`.
  */

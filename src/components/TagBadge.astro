@@ -1,6 +1,7 @@
 ---
 import type { Locale } from '@/lib/i18n';
 import { collectionPath } from '@/lib/i18n';
+import { tagLabel } from '@/lib/article';
 
 interface Props {
   tag: string;
@@ -16,5 +17,5 @@ const href = `${collectionPath('tags', locale)}/${encodeURIComponent(tag)}`;
   href={href}
   class:list={['badge', variant === 'accent' && 'badge-accent', 'no-underline']}
 >
-  #{tag}
+  {tagLabel(tag)}
 </a>
