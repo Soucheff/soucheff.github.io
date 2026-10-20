@@ -287,6 +287,8 @@ sem publicar. Apenas `refs/heads/main` gera o artefato de Pages e executa o job 
 publicação; as permissões de Pages e OIDC ficam restritas a esse job.
 As execuções são serializadas por ref, para que a validação de um PR não substitua
 uma publicação pendente na fila de produção.
+Os jobs usam `ubuntu-24.04`, uma versão suportada pelo Chromium da versão de
+Playwright fixada no lockfile, em vez de acompanhar mudanças de `ubuntu-latest`.
 
 > **Settings → Pages**: a *source* deve estar configurada como **GitHub Actions** (não "Deploy from a branch").
 
