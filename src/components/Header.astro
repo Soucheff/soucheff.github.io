@@ -1,8 +1,11 @@
 ---
 import type { Locale } from '@/lib/i18n';
 import { ui, collectionPath } from '@/lib/i18n';
+import { getDemosForLocale } from '@/lib/content';
+import { profile } from '@/lib/profile';
 import ThemeToggle from './ThemeToggle.astro';
 import LangSwitcher from './LangSwitcher.astro';
+import Icon from './Icon.astro';
 
 interface Props {
   locale: Locale;
@@ -11,108 +14,55 @@ interface Props {
 
 const { locale, translations } = Astro.props;
 const t = ui[locale];
-
 const homeHref = locale === 'pt' ? '/' : '/en/';
-
+const demos = await getDemosForLocale(locale);
 const nav = [
   { href: homeHref, label: t.navHome },
   { href: collectionPath('articles', locale), label: t.navArticles },
-  { href: collectionPath('demos', locale), label: t.navDemos },
-  { href: collectionPath('tags', locale), label: t.navTags },
-  { href: collectionPath('search', locale), label: t.navSearch },
+  ...(demos.length > 0 ? [{ href: collectionPath('demos', locale), label: t.navDemos }] : []),
+  { href: `${homeHref}#sobre`, label: t.navAbout },
 ];
-
 const currentPath = Astro.url.pathname.replace(/\/$/, '') || '/';
-const isActive = (href: string) => {
+const isActive = (href: string): boolean => {
   const normalized = href.replace(/\/$/, '') || '/';
-  if (normalized === '/' || normalized === '/en') {
-    return currentPath === normalized || currentPath === `${normalized}/`;
-  }
+  if (href.includes('#')) return false;
+  if (normalized === '/' || normalized === '/en') return currentPath === normalized;
   return currentPath === normalized || currentPath.startsWith(`${normalized}/`);
 };
 ---
 
-<header
-  class="border-b border-[color:var(--color-border)]"
-  style="background-color: var(--color-surface);"
->
-  <div class="container-wide flex flex-wrap items-center gap-4 py-4">
-    <a
-      href={homeHref}
-      class="flex items-center no-underline"
-      style="color: var(--color-text);"
-      aria-label={t.siteName}
-    >
-      <img
-        src="/images/brand/soucheff-logo.png"
-        alt={t.siteName}
-        width="120"
-        height="80"
-        class="h-20 w-auto rounded-md px-2 py-1"
-        loading="eager"
-        decoding="async"
-      />
+<header class="site-header" data-depth="4">
+  <div class="container-wide header-inner">
+    <a href={homeHref} class="site-brand" aria-label={t.siteName}>
+      <span class="brand-monogram" aria-hidden="true">{profile.initials}<span>.</span></span>
+      <span class="brand-name">Pedro <strong>Soucheff</strong></span>
     </a>
 
-    <nav aria-label="primary" class="ml-auto hidden items-center gap-1 md:flex">
+    <nav aria-label={t.primaryNavigation} class="desktop-nav">
       {nav.map((item) => (
-        <a
-          href={item.href}
-          class:list={[
-            'rounded-md px-3 py-1.5 text-sm font-medium no-underline',
-            isActive(item.href)
-              ? 'text-[color:var(--color-primary)]'
-              : 'text-[color:var(--color-text-muted)] hover:text-[color:var(--color-primary)]',
-          ]}
-          aria-current={isActive(item.href) ? 'page' : undefined}
-        >
+        <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
           {item.label}
         </a>
       ))}
     </nav>
 
-    <div class="ml-auto flex items-center gap-2 md:ml-0">
+    <div class="header-controls">
+      <a href={collectionPath('search', locale)} class="header-search" aria-label={t.navSearch} title={t.navSearch}>
+        <Icon name="search" />
+      </a>
       <LangSwitcher currentLocale={locale} translations={translations} fallbackHome={!translations} />
       <ThemeToggle locale={locale} />
-
-      <details class="nav-details relative md:hidden">
-        <summary
-          class="flex list-none items-center justify-center rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-2 text-[color:var(--color-text)]"
-          aria-label={t.navMenu}
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M3 6h18M3 12h18M3 18h18"></path>
-          </svg>
+      <details class="mobile-menu" data-mobile-menu>
+        <summary aria-label={t.navMenu}>
+          <Icon name="menu" />
         </summary>
-        <nav
-          aria-label={t.navMenu}
-          class="absolute right-0 top-full z-20 mt-2 flex w-48 flex-col gap-1 rounded-md border border-[color:var(--color-border)] p-2 shadow-lg"
-          style="background-color: var(--color-surface);"
-        >
+        <nav aria-label={t.navMenu} class="mobile-nav">
           {nav.map((item) => (
-            <a
-              href={item.href}
-              class:list={[
-                'rounded-md px-3 py-2 text-sm font-medium no-underline',
-                isActive(item.href)
-                  ? 'text-[color:var(--color-primary)]'
-                  : 'text-[color:var(--color-text-muted)] hover:text-[color:var(--color-primary)]',
-              ]}
-              aria-current={isActive(item.href) ? 'page' : undefined}
-            >
+            <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
               {item.label}
             </a>
           ))}
+          <a href={collectionPath('search', locale)}>{t.navSearch}<Icon name="search" size={16} /></a>
         </nav>
       </details>
     </div>
@@ -120,15 +70,61 @@ const isActive = (href: string) => {
 </header>
 
 <style>
-  .nav-details > summary {
-    cursor: pointer;
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    border-bottom: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-bg) 95%, transparent);
+    backdrop-filter: blur(12px);
   }
 
-  .nav-details > summary::-webkit-details-marker {
-    display: none;
-  }
+  .header-inner { display: flex; align-items: center; gap: 1.5rem; min-height: 82px; }
+  .site-brand { display: flex; align-items: center; gap: 0.75rem; color: var(--color-text); text-decoration: none; }
+  .brand-monogram { font-family: var(--font-display); font-size: 2rem; letter-spacing: -0.1em; font-weight: 600; }
+  .brand-monogram > span { color: var(--color-primary); }
+  .brand-name { font-size: 0.9rem; line-height: 1.3; white-space: nowrap; }
+  .brand-name strong { font-weight: 700; }
+  .desktop-nav { display: flex; gap: 1.6rem; margin-left: auto; }
+  .desktop-nav a { display: flex; align-items: center; min-height: 44px; color: var(--color-text-muted); font-size: 0.85rem; font-weight: 600; }
+  .desktop-nav a[aria-current] { color: var(--color-primary); }
+  .header-controls { display: flex; align-items: center; gap: 0.5rem; }
+  .header-search { display: inline-flex; width: 40px; height: 40px; align-items: center; justify-content: center; color: var(--color-text); }
+  .mobile-menu { display: none; }
+  .mobile-menu summary { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; list-style: none; cursor: pointer; border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
+  .mobile-menu summary::-webkit-details-marker { display: none; }
+  .mobile-menu[open] summary { color: var(--color-primary); border-color: var(--color-primary); }
+  .mobile-nav { position: absolute; top: calc(100% + 0.5rem); left: 1.25rem; right: 1.25rem; display: flex; flex-direction: column; gap: 0.25rem; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); box-shadow: var(--shadow); }
+  .mobile-nav a { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; color: var(--color-text); border-radius: var(--radius-sm); font-size: 0.9rem; }
+  .mobile-nav a[aria-current] { color: var(--color-primary); background: var(--color-surface-alt); }
 
-  .nav-details[open] > summary {
-    border-color: var(--color-primary);
+  @media (max-width: 767px) {
+    .header-inner { min-height: 74px; gap: 0.75rem; }
+    .desktop-nav { display: none; }
+    .header-controls { margin-left: auto; gap: 0.35rem; }
+    .mobile-menu { display: block; }
+    .brand-name { font-size: 0.8rem; }
+    .brand-name strong { display: block; }
+    .site-brand { gap: 0.5rem; }
+    .brand-monogram { font-size: 1.7rem; }
+    .header-search { display: none; }
   }
 </style>
+
+<script>
+  const menu = document.querySelector<HTMLDetailsElement>('[data-mobile-menu]');
+  if (menu) {
+    document.addEventListener('click', (event) => {
+      if (event.target instanceof Node && !menu.contains(event.target)) menu.open = false;
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && menu.open) {
+        menu.open = false;
+        menu.querySelector('summary')?.focus();
+      }
+    });
+    menu.querySelectorAll('a').forEach((link) => {
+      link.addEventListener('click', () => { menu.open = false; });
+    });
+  }
+</script>

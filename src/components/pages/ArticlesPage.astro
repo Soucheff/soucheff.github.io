@@ -1,0 +1,137 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import ArticleCard from '@/components/ArticleCard.astro';
+import Icon from '@/components/Icon.astro';
+import { ui, getLocalizedMeta, type Locale } from '@/lib/i18n';
+import { getArticlesForLocale, getTagAggregation } from '@/lib/content';
+import { tagLabel } from '@/lib/article';
+
+interface Props { locale: Locale; }
+const { locale } = Astro.props;
+const t = ui[locale];
+const [articles, allTags] = await Promise.all([getArticlesForLocale(locale), getTagAggregation(locale)]);
+const tags = allTags.filter((tag) => tag.articles > 0);
+const countLabel = t.filterCount.replace('{count}', String(articles.length)).replace('{total}', String(articles.length));
+---
+
+<BaseLayout locale={locale} title={t.navArticles} description={t.articlesDescription} translations={{ pt: '/artigos', en: '/en/articles' }}>
+  <header class="page-heading" data-depth="4" data-reveal>
+    <p class="eyebrow">{t.editorialEyebrow}</p>
+    <h1 class="display-title">{t.navArticles}<span class="catalog-total">{String(articles.length).padStart(2, '0')}</span></h1>
+    <p>{t.articlesDescription}</p>
+  </header>
+
+  {articles.length > 0 ? (
+    <div data-article-catalog>
+      <form class="catalog-filters" data-article-filters hidden role="search" aria-label={t.filterArticles}>
+        <div class="catalog-search">
+          <label for="article-query">{t.filterArticles}</label>
+          <div class="catalog-input">
+            <Icon name="search" />
+            <input id="article-query" name="q" type="search" placeholder={t.filterPlaceholder} aria-controls="article-results" />
+          </div>
+        </div>
+        <div class="catalog-topic">
+          <label for="article-topic">{t.exploreTopics}</label>
+          <select id="article-topic" name="tag" aria-controls="article-results">
+            <option value="">{t.allTopics}</option>
+            {tags.map((tag) => <option value={tag.tag}>{tagLabel(tag.tag)} ({tag.articles})</option>)}
+          </select>
+        </div>
+        <button class="text-link catalog-reset" type="button" data-clear-filters>{t.clearFilters}</button>
+      </form>
+      <p class="catalog-count" aria-live="polite" aria-atomic="true" data-filter-count data-template={t.filterCount}>{countLabel}</p>
+      <div class="article-grid" id="article-results">
+        {articles.map((entry) => {
+          const meta = getLocalizedMeta(entry, locale);
+          return (
+            <div data-filter-item data-search-text={`${meta.title} ${meta.description} ${entry.data.tags.map(tagLabel).join(' ')} ${entry.data.tags.join(' ')}`} data-tags={JSON.stringify(entry.data.tags)}>
+              <ArticleCard entry={entry} locale={locale} headingLevel="h2" />
+            </div>
+          );
+        })}
+      </div>
+      <div class="catalog-empty" data-filter-empty hidden>
+        <p>{t.filterEmpty}</p>
+        <button class="btn btn-secondary" type="button" data-clear-filters>{t.clearFilters}</button>
+      </div>
+    </div>
+  ) : <p>{t.noContent}</p>}
+</BaseLayout>
+
+<style>
+  .catalog-total { display: inline-block; margin-left: 1rem; vertical-align: top; margin-top: 0.45rem; font-family: var(--font-body); font-size: 1rem; letter-spacing: 0; color: var(--color-text-muted); }
+  .catalog-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 1rem; padding: 1.25rem; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); }
+  .catalog-search { flex: 1 1 260px; }
+  .catalog-filters label { display: block; margin-bottom: 0.5rem; font-size: 0.75rem; font-weight: 600; }
+  .catalog-input { display: flex; align-items: center; gap: 0.65rem; min-height: 46px; padding-inline: 0.85rem; border: 1px solid var(--color-border); border-radius: var(--radius-sm); color: var(--color-text-muted); background: var(--color-bg); }
+  .catalog-input:focus-within { outline: 3px solid var(--color-primary); outline-offset: 2px; }
+  .catalog-input input { width: 100%; min-width: 0; min-height: 44px; background: transparent; color: var(--color-text); font-size: 0.85rem; outline: none; }
+  .catalog-input input::placeholder { color: var(--color-text-muted); opacity: 1; }
+  .catalog-topic { flex: 0 1 250px; }
+  .catalog-topic select { width: 100%; min-height: 46px; padding: 0.7rem 2rem 0.7rem 0.8rem; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-bg); color: var(--color-text); font-size: 0.8rem; }
+  .catalog-reset { border: 0; background: none; color: var(--color-primary); font-size: 0.75rem; cursor: pointer; }
+  .catalog-count { margin-block: 1.5rem 0.5rem; color: var(--color-text-muted); font-size: 0.75rem; }
+  .catalog-empty { padding-block: 3rem; text-align: center; color: var(--color-text-muted); line-height: 1.8; }
+  .catalog-empty button { margin-top: 1.25rem; }
+  @media (max-width: 639px) {
+    .catalog-topic { flex-grow: 1; }
+    .catalog-reset { min-height: 46px; }
+  }
+</style>
+
+<script>
+  const catalog = document.querySelector<HTMLElement>('[data-article-catalog]');
+  const form = catalog?.querySelector<HTMLFormElement>('[data-article-filters]');
+  const query = form?.querySelector<HTMLInputElement>('[name="q"]');
+  const topic = form?.querySelector<HTMLSelectElement>('[name="tag"]');
+  const count = catalog?.querySelector<HTMLElement>('[data-filter-count]');
+  const empty = catalog?.querySelector<HTMLElement>('[data-filter-empty]');
+
+  if (catalog && form && query && topic && count && empty) {
+    const normalize = (text: string): string => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase();
+    const items = [...catalog.querySelectorAll<HTMLElement>('[data-filter-item]')].map((element) => {
+      const tags: string[] = JSON.parse(element.dataset.tags ?? '[]');
+      return { element, text: normalize(element.dataset.searchText ?? ''), tags };
+    });
+    const params = new URLSearchParams(window.location.search);
+    query.value = params.get('q') ?? '';
+    const initialTag = params.get('tag') ?? '';
+    if (initialTag && ![...topic.options].some((option) => option.value === initialTag)) {
+      topic.add(new Option(initialTag, initialTag));
+    }
+    topic.value = initialTag;
+
+    const applyFilters = (): void => {
+      const terms = normalize(query.value).trim().split(/\s+/).filter(Boolean);
+      let visible = 0;
+      items.forEach(({ element, text, tags }) => {
+        const matches = terms.every((term) => text.includes(term)) && (!topic.value || tags.includes(topic.value));
+        element.hidden = !matches;
+        if (matches) visible += 1;
+      });
+      count.textContent = (count.dataset.template ?? '').replace('{count}', String(visible)).replace('{total}', String(items.length));
+      empty.hidden = visible !== 0;
+      const url = new URL(window.location.href);
+      if (query.value.trim()) url.searchParams.set('q', query.value.trim());
+      else url.searchParams.delete('q');
+      if (topic.value) url.searchParams.set('tag', topic.value);
+      else url.searchParams.delete('tag');
+      window.history.replaceState(null, '', url);
+    };
+
+    query.addEventListener('input', applyFilters);
+    topic.addEventListener('change', applyFilters);
+    form.addEventListener('submit', (event) => { event.preventDefault(); applyFilters(); });
+    catalog.querySelectorAll<HTMLButtonElement>('[data-clear-filters]').forEach((button) => {
+      button.addEventListener('click', () => {
+        query.value = '';
+        topic.value = '';
+        applyFilters();
+        query.focus();
+      });
+    });
+    form.hidden = false;
+    applyFilters();
+  }
+</script>

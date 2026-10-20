@@ -2,8 +2,13 @@
 import type { CollectionEntry } from 'astro:content';
 import type { Locale } from '@/lib/i18n';
 import { collectionPath, getLocalizedMeta, ui } from '@/lib/i18n';
+import { formatArticleDate, getArticleDetails, prepareArticleHtml } from '@/lib/article';
+import { getArticlesForLocale } from '@/lib/content';
+import { profile } from '@/lib/profile';
 import BaseLayout from './BaseLayout.astro';
 import TagBadge from '@/components/TagBadge.astro';
+import ArticleCard from '@/components/ArticleCard.astro';
+import Icon from '@/components/Icon.astro';
 
 interface Props {
   entry: CollectionEntry<'articles'>;
@@ -14,12 +19,17 @@ interface Props {
 const { entry, locale, translations } = Astro.props;
 const meta = getLocalizedMeta(entry, locale);
 const t = ui[locale];
-
-const formatter = new Intl.DateTimeFormat(locale === 'pt' ? 'pt-BR' : 'en-US', {
-  year: 'numeric',
-  month: 'long',
-  day: 'numeric',
-});
+const details = getArticleDetails(entry.body, locale);
+const content = prepareArticleHtml(await Astro.slots.render('default'), locale, meta.title, t.scrollableTable);
+const home = locale === 'pt' ? '/' : '/en/';
+const ownArticle = entry.data.author === profile.name;
+const imageSrc = entry.data.cover?.src ?? details.image?.src;
+const related = (await getArticlesForLocale(locale))
+  .filter((article) => article.slug !== entry.slug)
+  .map((article) => ({ article, score: article.data.tags.filter((tag) => entry.data.tags.includes(tag)).length }))
+  .sort((a, b) => b.score - a.score)
+  .slice(0, 2)
+  .map(({ article }) => article);
 ---
 
 <BaseLayout
@@ -28,40 +38,125 @@ const formatter = new Intl.DateTimeFormat(locale === 'pt' ? 'pt-BR' : 'en-US', {
   description={meta.description}
   translations={translations}
   pagefindType="article"
+  ogType="article"
+  ogImage={imageSrc ? new URL(imageSrc, Astro.site).href : undefined}
 >
-  <article class="container-narrow">
-    <p class="mb-2 text-sm">
-      <a href={collectionPath('articles', locale)} class="no-underline" style="color: var(--color-text-muted);">← {t.backToList}</a>
-    </p>
-    <h1 class="mb-3 text-4xl font-bold" style="color: var(--color-text);">{meta.title}</h1>
-    <p class="mb-4 text-lg" style="color: var(--color-text-muted);">{meta.description}</p>
+  <Fragment slot="head">
+    <meta property="article:published_time" content={entry.data.pubDate.toISOString()} />
+    {entry.data.updatedDate && <meta property="article:modified_time" content={entry.data.updatedDate.toISOString()} />}
+    <script is:inline type="application/ld+json" set:html={JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'BlogPosting',
+      headline: meta.title,
+      description: meta.description,
+      datePublished: entry.data.pubDate.toISOString(),
+      dateModified: (entry.data.updatedDate ?? entry.data.pubDate).toISOString(),
+      inLanguage: locale === 'pt' ? 'pt-BR' : 'en-US',
+      mainEntityOfPage: new URL(Astro.url.pathname, Astro.site).href,
+      ...(imageSrc ? { image: new URL(imageSrc, Astro.site).href } : {}),
+      author: { '@type': 'Person', name: entry.data.author, ...(ownArticle ? { url: profile.linkedIn } : {}) },
+    })} />
+  </Fragment>
 
-    <div class="mb-6 flex flex-wrap items-center gap-3 text-sm" style="color: var(--color-text-muted);">
-      <span><strong>{t.author}:</strong> {entry.data.author}</span>
-      <span>·</span>
-      <time datetime={entry.data.pubDate.toISOString()}>
-        {t.publishedOn} {formatter.format(entry.data.pubDate)}
-      </time>
-      {entry.data.updatedDate && (
-        <>
-          <span>·</span>
-          <time datetime={entry.data.updatedDate.toISOString()}>
-            {t.updatedOn} {formatter.format(entry.data.updatedDate)}
-          </time>
-        </>
-      )}
-    </div>
-
-    {entry.data.tags.length > 0 && (
-      <div class="mb-8 flex flex-wrap gap-1.5">
-        {entry.data.tags.map((tag) => (
-          <TagBadge tag={tag} locale={locale} />
-        ))}
+  <article class="article-page">
+    <header class="article-header depth-4" data-depth="4">
+      <a href={collectionPath('articles', locale)} class="article-back text-link">← {t.backToArticles}</a>
+      <h1 id={content.titleId ?? 'article-title'} class="display-title" data-pagefind-meta="title">{meta.title}</h1>
+      <p class="article-lead">{meta.description}</p>
+      <div class="article-byline">
+        {ownArticle && <span class="author-initials" aria-hidden="true">{profile.initials}</span>}
+        {ownArticle ? <a href={`${home}#sobre`} class="byline-name">{entry.data.author}</a> : <span class="byline-name">{entry.data.author}</span>}
+        <span aria-hidden="true">·</span>
+        <time datetime={entry.data.pubDate.toISOString()}>{formatArticleDate(entry.data.pubDate, locale)}</time>
+        <span aria-hidden="true">·</span>
+        <span class="reading-time"><Icon name="clock" size={14} />{details.readingMinutes} {t.readingMinutes}</span>
       </div>
-    )}
+      {entry.data.updatedDate && (
+        <p class="article-updated">{t.updatedOn} <time datetime={entry.data.updatedDate.toISOString()}>{formatArticleDate(entry.data.updatedDate, locale)}</time></p>
+      )}
+      {entry.data.tags.length > 0 && (
+        <div class="article-tags">{entry.data.tags.map((tag) => <TagBadge tag={tag} locale={locale} />)}</div>
+      )}
+    </header>
 
-    <div class="prose dark:prose-invert max-w-none">
-      <slot />
+    <div class:list={['article-reading', content.headings.length > 0 && 'article-reading--with-toc']}>
+      {content.headings.length > 0 && (
+        <aside class="article-aside" data-pagefind-ignore>
+          <details class="article-toc" data-article-toc>
+            <summary>{t.tableOfContents}<Icon name="chevron" size={16} /></summary>
+            <nav aria-label={t.tableOfContents}>
+              <ol>{content.headings.map((heading) => <li><a href={`#${heading.id}`}>{heading.text}</a></li>)}</ol>
+            </nav>
+          </details>
+        </aside>
+      )}
+      <div class="article-body prose dark:prose-invert max-w-none" set:html={content.html} />
     </div>
+
+    <footer class="article-author" data-pagefind-ignore>
+      <div>
+        <p class="eyebrow">{t.author}</p>
+        <p class="author-name">{entry.data.author}</p>
+        {ownArticle && <p class="author-description">{t.authorDescription}</p>}
+      </div>
+      {ownArticle && <a href={profile.linkedIn} class="btn btn-secondary" target="_blank" rel="me noopener noreferrer">LinkedIn<Icon name="arrow-up-right" /></a>}
+    </footer>
   </article>
+
+  {related.length > 0 && (
+    <section class="related-articles" aria-labelledby="related-title" data-pagefind-ignore>
+      <div class="section-heading">
+        <h2 id="related-title" class="display-title">{t.continueReading}</h2>
+        <a href={collectionPath('articles', locale)} class="text-link">{t.backToArticles}<Icon name="arrow-right" /></a>
+      </div>
+      <div class="article-grid">{related.map((article) => <ArticleCard entry={article} locale={locale} />)}</div>
+    </section>
+  )}
 </BaseLayout>
+
+<style>
+  .article-header { max-width: 1000px; margin-bottom: 2.5rem; }
+  .article-back { margin-bottom: 1.2rem; color: var(--color-text-muted); font-size: 0.8rem; }
+  .article-header h1 { max-width: 970px; margin-bottom: 1.25rem; font-size: clamp(2.1rem, 4.5vw, 3.5rem); line-height: 1.12; overflow-wrap: anywhere; }
+  .article-lead { max-width: 850px; margin-bottom: 1.5rem; color: var(--color-text-muted); font-size: clamp(1rem, 1.6vw, 1.15rem); line-height: 1.8; }
+  .article-byline { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; color: var(--color-text-muted); font-size: 0.75rem; }
+  .author-initials { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: var(--color-surface-alt); font-family: var(--font-display); font-weight: 600; color: var(--color-text); font-size: 0.85rem; }
+  .byline-name { color: var(--color-text); font-weight: 600; }
+  .reading-time { display: inline-flex; align-items: center; gap: 0.3rem; }
+  .article-updated { margin-top: 0.65rem; font-size: 0.7rem; color: var(--color-text-muted); }
+  .article-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 1.25rem; }
+  .article-reading { display: grid; grid-template-columns: minmax(0, 760px); justify-content: center; align-items: start; gap: 2.5rem; border-top: 1px solid var(--color-border); padding-top: 2.5rem; }
+  .article-reading--with-toc { grid-template-columns: minmax(0, 1fr) 230px; }
+  .article-reading > .article-body { grid-column: 1; grid-row: 1; }
+  .article-aside { grid-column: 2; grid-row: 1; position: sticky; top: 110px; min-width: 0; }
+  .article-toc { border-left: 1px solid var(--color-border); padding-left: 1.25rem; }
+  .article-toc summary { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; min-height: 44px; list-style: none; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
+  .article-toc summary::-webkit-details-marker { display: none; }
+  .article-toc nav { max-height: calc(100vh - 200px); overflow-y: auto; scrollbar-width: thin; }
+  .article-toc ol { list-style: none; margin: 0; padding: 0.5rem 0; }
+  .article-toc li + li { margin-top: 0.25rem; }
+  .article-toc a { display: block; padding: 0.5rem 0.25rem; color: var(--color-text-muted); font-size: 0.72rem; line-height: 1.6; text-decoration: none; overflow-wrap: anywhere; }
+  .article-toc a:hover { color: var(--color-primary); }
+  .article-author { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1.25rem; margin-top: 3.5rem; padding: 1.5rem; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
+  .author-name { margin-top: 0.7rem; font-size: 1.1rem; font-weight: 700; }
+  .author-description { max-width: 560px; margin-top: 0.5rem; color: var(--color-text-muted); font-size: 0.85rem; line-height: 1.8; }
+  .related-articles { margin-top: 4rem; }
+  @media (max-width: 1023px) {
+    .article-reading, .article-reading--with-toc { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+    .article-aside { position: static; grid-column: 1; grid-row: auto; }
+    .article-reading > .article-body { grid-column: 1; grid-row: auto; }
+    .article-toc { border: 1px solid var(--color-border); border-radius: var(--radius); padding: 0.5rem 1rem; background: var(--color-surface); }
+    .article-toc nav { max-height: 360px; }
+    .article-toc a { font-size: 0.8rem; }
+  }
+</style>
+
+<script>
+  const toc = document.querySelector<HTMLDetailsElement>('[data-article-toc]');
+  if (toc) {
+    const desktop = window.matchMedia('(min-width: 1024px)');
+    const setTocState = (): void => { toc.open = desktop.matches; };
+    setTocState();
+    desktop.addEventListener('change', setTocState);
+  }
+</script>

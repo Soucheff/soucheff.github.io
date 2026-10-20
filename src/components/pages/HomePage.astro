@@ -1,0 +1,186 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import ArticleCard from '@/components/ArticleCard.astro';
+import DemoCard from '@/components/DemoCard.astro';
+import Icon from '@/components/Icon.astro';
+import { ui, collectionPath, type Locale } from '@/lib/i18n';
+import { getArticlesForLocale, getDemosForLocale, getTagAggregation } from '@/lib/content';
+import { tagLabel } from '@/lib/article';
+import { profile } from '@/lib/profile';
+
+interface Props { locale: Locale; }
+const { locale } = Astro.props;
+const t = ui[locale];
+const [articles, demos, tags] = await Promise.all([
+  getArticlesForLocale(locale),
+  getDemosForLocale(locale),
+  getTagAggregation(locale),
+]);
+const [featured, ...recent] = articles.slice(0, 4);
+const topics = tags.filter((tag) => tag.articles > 0).slice(0, 6);
+---
+
+<BaseLayout locale={locale} title={t.siteName} description={t.profileIntro} translations={{ pt: '/', en: '/en/' }}>
+  <script is:inline slot="head" type="application/ld+json" set:html={JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'Person',
+    name: profile.name,
+    url: new URL(locale === 'pt' ? '/' : '/en/', Astro.site).href,
+    sameAs: [profile.linkedIn, profile.github],
+  })} />
+
+  <section class="hero scene" aria-labelledby="profile-title">
+    <div class="layer depth-0 hero-wash" data-depth="0" aria-hidden="true"></div>
+    <div class="layer depth-1 hero-rules" data-depth="1" aria-hidden="true"></div>
+    <div class="hero-copy depth-4" data-depth="4" data-reveal>
+      <p class="eyebrow">{t.profileEyebrow}</p>
+      <h1 id="profile-title" class="display-title">Pedro Soucheff<span>.</span></h1>
+      <p class="hero-headline">{t.profileHeadline}</p>
+      <p class="hero-intro">{t.profileIntro}</p>
+      <div class="hero-actions">
+        <a href={collectionPath('articles', locale)} class="btn btn-primary">
+          {t.exploreArticles}<Icon name="arrow-right" />
+        </a>
+        <a href={profile.linkedIn} class="text-link" target="_blank" rel="me noopener noreferrer">
+          LinkedIn<Icon name="arrow-up-right" />
+        </a>
+        <a href={profile.github} class="text-link hero-github" target="_blank" rel="me noopener noreferrer">
+          GitHub<Icon name="arrow-up-right" />
+        </a>
+      </div>
+    </div>
+    <div class="hero-signature depth-3" data-depth="3" aria-hidden="true">
+      <span class="signature-label">PEDRO SOUCHEFF / FIELD NOTES</span>
+      <div class="signature-orbit"></div>
+      <div class="signature-inner"></div>
+      <span class="signature-initials">PS<span>.</span></span>
+      <span class="signature-coordinate">IDENTITY + SECURITY</span>
+      <span class="signature-dot"></span>
+    </div>
+  </section>
+
+  <section class="publications scene" aria-labelledby="publications-title">
+    <header class="section-heading depth-4" data-depth="4">
+      <div>
+        <p class="eyebrow">{t.editorialEyebrow}</p>
+        <h2 id="publications-title" class="display-title">{t.editorialTitle}</h2>
+      </div>
+      <a href={collectionPath('articles', locale)} class="text-link">{t.viewAllArticles}<Icon name="arrow-right" /></a>
+    </header>
+    {featured ? (
+      <>
+        <div data-reveal><ArticleCard entry={featured} locale={locale} featured /></div>
+        {recent.length > 0 && (
+          <div class="article-grid recent-grid">
+            {recent.map((entry) => <ArticleCard entry={entry} locale={locale} />)}
+          </div>
+        )}
+      </>
+    ) : <p class="empty-content">{t.noContent}</p>}
+  </section>
+
+  {topics.length > 0 && (
+    <section class="topics-section scene" aria-labelledby="topics-title">
+      <header class="section-heading depth-4" data-depth="4">
+        <div>
+          <h2 id="topics-title" class="display-title">{t.exploreTopics}</h2>
+          <p class="section-description">{t.topicsDescription}</p>
+        </div>
+      </header>
+      <div class="topics-grid depth-4" data-depth="4">
+        {topics.map((topic) => (
+          <a href={`${collectionPath('articles', locale)}?tag=${encodeURIComponent(topic.tag)}`} class="topic-link">
+            <span>{tagLabel(topic.tag)}</span>
+            <span class="topic-count">{String(topic.articles).padStart(2, '0')}<Icon name="arrow-right" size={16} /></span>
+          </a>
+        ))}
+      </div>
+    </section>
+  )}
+
+  {demos.length > 0 && (
+    <section class="demos-section" aria-labelledby="demos-title">
+      <header class="section-heading">
+        <h2 id="demos-title" class="display-title">{t.featuredDemos}</h2>
+        <a href={collectionPath('demos', locale)} class="text-link">{t.viewAllDemos}<Icon name="arrow-right" /></a>
+      </header>
+      <div class="article-grid">{demos.slice(0, 3).map((entry) => <DemoCard entry={entry} locale={locale} />)}</div>
+    </section>
+  )}
+
+  <section id="sobre" class="about-section scene" aria-labelledby="about-title">
+    <div class="layer depth-0 about-background" data-depth="0" aria-hidden="true"></div>
+    <div class="about-monogram depth-3" data-depth="3" aria-hidden="true">{profile.initials}<span>.</span></div>
+    <div class="depth-4" data-depth="4" data-reveal>
+      <p class="eyebrow">{t.navAbout} / {profile.name}</p>
+      <h2 id="about-title" class="display-title">{t.aboutTitle}</h2>
+      <p class="about-description">{t.aboutDescription}</p>
+      <a href={profile.linkedIn} class="text-link" target="_blank" rel="me noopener noreferrer">
+        {t.connectLinkedIn}<Icon name="arrow-up-right" />
+      </a>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .hero { display: grid; grid-template-columns: minmax(0, 1fr) 260px; align-items: center; gap: 2rem; padding-block: 0.75rem 4.5rem; }
+  .hero-wash { background: radial-gradient(ellipse at 90% 40%, color-mix(in srgb, var(--color-accent) 5%, transparent), transparent 50%); }
+  .hero-rules { background: linear-gradient(90deg, transparent 76%, var(--color-border) 76%, var(--color-border) calc(76% + 1px), transparent calc(76% + 1px)); opacity: 0.45; }
+  .hero h1 { margin-block: 1.15rem 1.3rem; font-size: clamp(3.5rem, 6.9vw, 5.6rem); }
+  .hero h1 > span { color: var(--color-primary); }
+  .hero-headline { max-width: 570px; font-size: clamp(1.15rem, 2vw, 1.4rem); font-weight: 600; line-height: 1.5; letter-spacing: -0.02em; }
+  .hero-intro { max-width: 550px; margin-top: 0.8rem; color: var(--color-text-muted); font-size: 1rem; line-height: 1.85; }
+  .hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.5rem; margin-top: 1.7rem; }
+  .hero-signature { width: 260px; height: 280px; display: flex; align-items: center; justify-content: center; }
+  .signature-label, .signature-coordinate { position: absolute; font-family: ui-monospace, monospace; font-size: 0.55rem; letter-spacing: 0.12em; color: var(--color-text-muted); }
+  .signature-label { top: 0; left: 0; }
+  .signature-coordinate { bottom: 0; right: 0; }
+  .signature-orbit { position: absolute; width: 240px; height: 240px; border: 1px solid var(--color-border); border-radius: 50%; }
+  .signature-inner { position: absolute; width: 195px; height: 195px; border: 1px dashed var(--color-border); border-radius: 50%; }
+  .signature-initials { font-family: var(--font-display); font-size: 6rem; letter-spacing: -0.12em; color: var(--color-text); }
+  .signature-initials > span { color: var(--color-primary); }
+  .signature-dot { position: absolute; top: 42px; right: 37px; width: 12px; height: 12px; border: 3px solid var(--color-bg); border-radius: 50%; background: var(--color-accent); }
+  .publications { border-top: 1px solid var(--color-border); padding-top: 2.25rem; }
+  .recent-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2rem; margin-top: 2rem; }
+  .topics-section { margin-top: 3.5rem; }
+  .section-description { margin-top: 0.7rem; color: var(--color-text-muted); font-size: 0.9rem; line-height: 1.7; }
+  .topics-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
+  .topic-link { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; min-height: 64px; padding: 1rem; border: 1px solid var(--color-border); border-radius: var(--radius); color: var(--color-text); background: var(--color-surface); font-size: 0.8rem; font-weight: 600; text-decoration: none; }
+  .topic-link:hover { border-color: var(--color-primary); }
+  .topic-count { display: inline-flex; align-items: center; gap: 0.7rem; color: var(--color-text-muted); font-size: 0.7rem; font-weight: 400; }
+  .about-section { display: grid; grid-template-columns: 120px minmax(0, 1fr); align-items: center; gap: 2rem; margin-top: 4rem; padding: 2.5rem; scroll-margin-top: 7rem; }
+  .about-background { background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
+  .about-monogram { font-family: var(--font-display); font-size: 5rem; letter-spacing: -0.1em; }
+  .about-monogram > span { color: var(--color-primary); }
+  .about-section h2 { max-width: 620px; margin-top: 0.75rem; font-size: clamp(1.75rem, 3vw, 2.4rem); }
+  .about-description { max-width: 680px; margin-block: 1rem 0.5rem; color: var(--color-text-muted); font-size: 0.9rem; line-height: 1.85; }
+  .demos-section { margin-top: 3.5rem; }
+  .empty-content { color: var(--color-text-muted); padding-block: 2rem; }
+
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: minmax(0, 1fr) 180px; }
+    .hero-signature { width: 180px; }
+    .signature-orbit { width: 175px; height: 175px; }
+    .signature-inner { width: 140px; height: 140px; }
+    .signature-initials { font-size: 5rem; }
+    .signature-dot { top: 67px; right: 20px; }
+    .signature-label, .signature-coordinate { font-size: 0.45rem; }
+    .recent-grid { gap: 1.25rem; }
+  }
+  @media (max-width: 767px) {
+    .hero { grid-template-columns: minmax(0, 1fr); padding-block: 0 2.5rem; }
+    .hero-signature, .hero-rules { display: none; }
+    .hero h1 { max-width: 480px; font-size: clamp(3.25rem, 11vw, 4.5rem); }
+    .hero-intro { font-size: 0.95rem; }
+    .hero-actions { gap: 0.5rem 1.25rem; }
+    .hero-github { display: none; }
+    .publications { padding-top: 1.5rem; }
+    .recent-grid { grid-template-columns: minmax(0, 1fr); margin-top: 1.25rem; gap: 0; }
+    .topics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .about-section { grid-template-columns: minmax(0, 1fr); padding: 1.5rem; gap: 0; }
+    .about-monogram { display: none; }
+  }
+  @media (max-width: 400px) {
+    .topics-grid { grid-template-columns: minmax(0, 1fr); }
+  }
+</style>
