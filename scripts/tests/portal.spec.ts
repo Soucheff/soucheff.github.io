@@ -9,6 +9,25 @@ import { getArticleDetails, prepareArticleHtml, formatArticleDate } from '../../
 const mediumArticlePath = '/artigos/autenticacao-contexto-cae-aspnet-core';
 const mediumArticleTitle = 'Autenticação Baseada em Contexto e CAE (Continuous Access Evaluation) em Aplicações ASP.NET Core';
 
+for (const locale of ['pt', 'en'] as const) {
+  test(`removed Zero Trust article is absent from routes, discovery, and search (${locale})`, async ({ page }) => {
+    const prefix = locale === 'pt' ? '' : '/en';
+    const articles = locale === 'pt' ? '/artigos' : '/en/articles';
+    const search = locale === 'pt' ? '/buscar' : '/en/search';
+    const response = await page.goto(`${articles}/zero-trust-entra`);
+    expect(response?.status()).toBe(404);
+
+    for (const path of [`${prefix}/`, articles, `${prefix}/tags/zero-trust`, `${articles}/entra-agentid-accesspackage`]) {
+      await page.goto(path);
+      await expect(page.locator('main a[href*="/zero-trust-entra"]')).toHaveCount(0);
+    }
+
+    await page.goto(`${search}?q=Zero%20Trust`);
+    await expect(page.locator('.pagefind-ui__result-link').first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.pagefind-ui__result-link[href*="/zero-trust-entra"]')).toHaveCount(0);
+  });
+}
+
 test('Medium republication keeps its original date and source, with reviewed examples and local images', async ({ page }) => {
   await page.goto(mediumArticlePath);
   await expect(page.locator('main h1')).toHaveText(mediumArticleTitle);
